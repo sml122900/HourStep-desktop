@@ -1,0 +1,3 @@
+# pnpm 11+ 설정 파일. esbuild 는 vite 가 쓰는 네이티브 바이너리라 postinstall 실행이 필요하다.
+allowBuilds:
+  esbuild: true

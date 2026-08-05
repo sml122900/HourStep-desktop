@@ -1,0 +1,8 @@
+# 모든 플랫폼에서 작업 트리를 LF로 통일한다.
+# .prettierrc.json 의 endOfLine: "lf" 와 맞추기 위함 — Windows 기본 autocrlf=true 로
+# 클론하면 CRLF 가 되어 `pnpm format:check` 가 깨진다.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary

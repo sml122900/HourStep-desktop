@@ -1,0 +1,128 @@
+/* 오버레이 창은 프레임리스 + 투명. 카드 영역 밖은 아무것도 그리지 않는다. */
+html,
+body,
+#root {
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+.overlay-root {
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* 화면 최상단에서 살짝 띄운 위치가 카드의 정착 지점 */
+  padding-top: 26px;
+}
+
+.card {
+  width: 540px;
+  padding: 18px 22px 16px;
+  border-radius: 18px;
+
+  background: linear-gradient(180deg, rgba(30, 34, 44, 0.94), rgba(20, 23, 30, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px) saturate(140%);
+  color: var(--text);
+
+  /* 슬라이드 인/아웃: 창 위쪽(화면 밖)에서 내려온다 */
+  transform: translateY(calc(-100% - 26px));
+  opacity: 0;
+  transition:
+    transform 320ms cubic-bezier(0.18, 0.89, 0.32, 1.14),
+    opacity 180ms ease-out;
+}
+
+.card--in {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* 슬라이드 아웃은 더 빠르고 덤덤하게 (SLIDE_OUT_MS 와 동기화) */
+.card:not(.card--in) {
+  transition:
+    transform 220ms cubic-bezier(0.4, 0, 1, 1),
+    opacity 200ms ease-in;
+}
+
+.card__body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.card__icon {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  border-radius: 14px;
+  background: rgba(79, 140, 255, 0.16);
+  border: 1px solid rgba(79, 140, 255, 0.26);
+}
+
+.card__message {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+.card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-left: 60px;
+}
+
+.btn {
+  padding: 8px 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background 120ms ease,
+    transform 90ms ease;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--primary {
+  background: linear-gradient(180deg, #5b93ff, #3f79ee);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn--primary:hover {
+  background: linear-gradient(180deg, #6b9fff, #4a83f5);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}

@@ -1,0 +1,45 @@
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.settings {
+  height: 100%;
+  padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings h1 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.row input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 40ch;
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: #ff8080;
+}
