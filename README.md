@@ -31,7 +31,9 @@ $env:HOURSTEP_SPIKE_AUTO_OVERLAY = "1"; pnpm tauri dev
 
 ## 문서
 
-- `CLAUDE.md` — 제품 정의, 핵심 결정, 코딩 규칙
-- `docs/phase-d0-verification.md` — D0 수동 검증 절차 (A~F)
+- `CLAUDE.md` — 제품 정의, 핵심 결정, 코딩 규칙, 검증 정책
+- `docs/phase-d0-verification.md` — D0 검증 절차 (A~F)와 결과
 - `docs/daily/` — 작업 일지
-- `docs/decisions/` — 기술 결정 기록
+- `docs/decisions/` — 기술 결정 기록 (PAR)
+- `docs/troubleshooting/` — 해결한 문제 기록
+- `docs/par-materials.md` — 이력서용 PAR 소재
