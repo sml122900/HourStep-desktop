@@ -173,24 +173,31 @@ pnpm tauri dev
 ## 결과 요약
 
 자동 검증 1차 (2026-08-05, 1920×1080 단일 모니터 100%).
-`SendInput` 합성 입력 + `Graphics.CopyFromScreen` 화면 캡처 + `WindowFromPoint` 히트테스트로 실행.
 
-| 항목 | 결과 | 비고 |
-| --- | --- | --- |
-| **B-1** 카드가 브라우저 위에 표시 | ✅ | 스크린샷으로 확인 — Chrome/YouTube 위에 아이콘·문구·버튼 3개 정상 렌더링 |
-| **B-2** 포커스 미탈취 | ✅ | 표시 순간 foreground 불변. **클릭 순간에도 불변** (`WS_EX_NOACTIVATE`) |
-| **B-3** Alt+Tab 제외 | ✅ | `WS_EX_TOOLWINDOW` 설정 + `WS_EX_APPWINDOW` 해제 → 후보 판정 False (메모장은 True 로 로직 검증) |
-| **B-4** 버튼 클릭 → 로그 → 사라짐 | ✅ | 합성 클릭으로 `[overlay] action = done` → `[overlay] hide` → `IsWindowVisible=False` |
-| **B-5** 유령 사각형 회귀 | ✅ | 숨긴 뒤 같은 좌표 히트테스트가 실제 Chrome 을 반환 |
-| **C-2** borderless 전체화면(F11) 위 | ✅ | 스크린샷으로 확인. 대상 창은 TOPMOST 아님 |
-| **C-1** Fullscreen API(유튜브 F) 위 | ⏳ 미검증 | 자동화 셋업 실패(테스트 창이 포그라운드 상실). Chrome 기준 C-2 와 동일한 fullscreen 창 상태라 통과 가능성이 높지만 **실측 필요** |
-| **C-3~C-5** 플레이어 / 게임 | ⏳ 미검증 | 실제 앱 필요. **C-5(배타적 전체화면)는 사람만 가능** |
-| **D** 듀얼 모니터 | — 해당 없음 | `Screen.AllScreens` = 1개 (`\\.\DISPLAY1` 1920×1080, DPI 96) |
-| **E-1/E-2** 창 닫기 → 상주 | ✅ | 메인 창에 `WM_CLOSE` → 창 숨김 + 프로세스 생존 |
-| **E-3** 닫은 뒤 알림 동작 | ✅ | 메인 창이 숨겨진 상태에서 위 B 항목 전부 통과 |
-| **E-4** 트레이 종료 | ⏳ 미검증 | 트레이 클릭 필요 |
-| **F-1** 작업 시작 placeholder | ⏳ 미검증 | 트레이 클릭 필요 |
-| **A** 재부팅 자동 상주 | ⏳ 미검증 | 재부팅 필요 |
+> ⚠️ **이 1차 검증의 일부는 지금은 금지된 방법으로 얻었다.**
+> 당시 사용자 데스크톱 세션에 `SendInput` 합성 입력을 주입했고, 그 과정에서 클릭·키 입력이
+> 사용자의 Chrome / Claude 앱으로 흘러들어갔다. 이후 CLAUDE.md 「검증 정책」으로
+> **합성 입력 주입을 금지**했다. 아래 표의 `방법` 열이 `SendInput` 인 항목은
+> `--debug-cmd` 디버그 훅 또는 격리 환경(Windows Sandbox/VM)에서 **재검증 대상**이다.
+> 상태 검사(`EnumWindows` / `GetWindowLongW` / `WindowFromPoint`)와 화면 캡처는 읽기 전용이라 유효하다.
+
+| 항목 | 결과 | 방법 | 비고 |
+| --- | --- | --- | --- |
+| **B-1** 카드가 브라우저 위에 표시 | ✅ | 캡처 | Chrome/YouTube 위에 아이콘·문구·버튼 3개 정상 렌더링 |
+| **B-2** 포커스 미탈취 (표시 시) | ✅ | 상태 검사 | 표시 전후 `GetForegroundWindow` 불변 |
+| **B-2'** 포커스 미탈취 (클릭 시) | ⚠️ 재검증 | **SendInput** | 클릭해도 foreground 불변 (`WS_EX_NOACTIVATE`). 근거 방법이 금지됨 |
+| **B-3** Alt+Tab 제외 | ✅ | 상태 검사 | `WS_EX_TOOLWINDOW` 설정 + `WS_EX_APPWINDOW` 해제 → 후보 판정 False (메모장은 True 로 로직 검증) |
+| **B-4** 버튼 클릭 → 로그 → 사라짐 | ⚠️ 재검증 | **SendInput** | `[overlay] action = done` → `[overlay] hide` → `IsWindowVisible=False`. `--debug-cmd` 로 재검증 필요 |
+| **B-5** 유령 사각형 회귀 | ✅ | 히트테스트 | 숨긴 뒤 같은 좌표가 실제 Chrome 을 반환 |
+| **C-2** borderless 전체화면(F11) 위 | ✅ | 캡처 + 상태 검사 | 대상 창은 TOPMOST 아님. F11 전송은 제가 띄운 테스트 창 대상 |
+| **C-1** Fullscreen API(유튜브 F) 위 | ⏳ 미검증 | — | 자동화 셋업 실패. Chrome 기준 C-2 와 동일한 fullscreen 창 상태라 통과 가능성이 높지만 **실측 필요** |
+| **C-3~C-5** 플레이어 / 게임 | ⏳ 미검증 | — | 실제 앱 필요. **C-5(배타적 전체화면)는 사람만 가능** |
+| **D** 듀얼 모니터 | — 해당 없음 | 상태 검사 | `Screen.AllScreens` = 1개 (`\\.\DISPLAY1` 1920×1080, DPI 96) |
+| **E-1/E-2** 창 닫기 → 상주 | ✅ | `WM_CLOSE` + 프로세스 | 창 숨김 + 프로세스 생존. `PostMessage` 는 합성 입력이 아니라 창 메시지라 정책상 허용 |
+| **E-3** 닫은 뒤 알림 동작 | ✅ | 상태 검사 | 메인 창이 숨겨진 상태에서 위 B 항목 전부 통과 |
+| **E-4** 트레이 종료 | ⏳ 미검증 | — | 트레이 클릭 필요 → `--debug-cmd quit` 로 대체 가능 |
+| **F-1** 작업 시작 placeholder | ⏳ 미검증 | — | 트레이 클릭 필요 → `--debug-cmd start-session` 로 대체 가능 |
+| **A** 재부팅 자동 상주 | ⏳ 미검증 | — | 재부팅 필요 — 정책상 사용자 몫 |
 
 ### 추가로 확정된 사실
 
