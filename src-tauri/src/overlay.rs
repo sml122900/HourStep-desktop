@@ -120,3 +120,36 @@ pub fn hide_overlay(app: AppHandle) -> Result<(), String> {
 pub fn log_overlay_action(action: String) {
     println!("[overlay] action = {action}");
 }
+
+/// 오버레이의 실제 표시 여부.
+///
+/// `WebviewWindow::is_visible()` 을 쓰면 안 된다 — show/hide 를 raw Win32 로 하기 때문에
+/// tao 의 `WindowFlags::VISIBLE` 캐시가 갱신되지 않아 항상 "숨김"으로 답한다.
+/// (docs/decisions/0001)
+///
+/// 현재 호출부는 `--debug-cmd dump` 뿐이라 릴리스 빌드에서는 dead code 가 된다.
+#[cfg_attr(not(debug_assertions), allow(dead_code))]
+pub fn is_visible(app: &AppHandle) -> bool {
+    let Some(window) = app.get_webview_window(OVERLAY_LABEL) else {
+        return false;
+    };
+
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::HWND;
+        use windows_sys::Win32::UI::WindowsAndMessaging::IsWindowVisible;
+
+        match window.hwnd() {
+            Ok(raw) => {
+                let hwnd: HWND = raw.0 as isize as HWND;
+                unsafe { IsWindowVisible(hwnd) != 0 }
+            }
+            Err(_) => false,
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        window.is_visible().unwrap_or(false)
+    }
+}

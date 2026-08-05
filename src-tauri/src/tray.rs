@@ -49,12 +49,15 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// D0 placeholder — 실제 세션 시작은 D1 범위.
+/// `--debug-cmd start-session` 이 이 함수를 그대로 호출하므로 자동 검증과 트레이 동작이 어긋나지 않는다.
+pub fn start_session_placeholder() {
+    println!("[tray] 작업 시작 (placeholder — D1에서 구현)");
+}
+
 fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match event.id.as_ref() {
-        ID_START_SESSION => {
-            // D0 placeholder — 실제 세션 시작은 D1 범위
-            println!("[tray] 작업 시작 (placeholder — D1에서 구현)");
-        }
+        ID_START_SESSION => start_session_placeholder(),
         ID_TEST_NOTIFICATION => {
             println!("[tray] 테스트 알림 트리거");
             overlay::trigger(app);

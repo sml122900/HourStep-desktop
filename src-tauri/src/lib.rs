@@ -1,3 +1,5 @@
+#[cfg(debug_assertions)]
+mod debug_cmd;
 mod overlay;
 mod tray;
 mod windows;
@@ -46,40 +48,11 @@ pub fn run() {
                 let _ = main.set_focus();
             }
 
-            // D0 스파이크 자동 검증용 스모크 경로.
-            // 개발 빌드에서 HOURSTEP_SPIKE_AUTO_OVERLAY=1 이면 사람이 트레이를 클릭하지 않아도
-            // 오버레이가 주기적으로 떴다 사라진다. 전체화면 앱(C 항목)처럼 트레이를 누를 수 없는
-            // 상황에서 카드를 띄우기 위한 것 — 그래서 1회성이 아니라 반복이어야 한다.
+            // 자동 검증용 디버그 훅 (개발 빌드 전용).
+            // 합성 입력 주입 없이 트레이/클릭 시나리오를 검증하기 위한 경로 — CLAUDE.md 「검증 정책」
             #[cfg(debug_assertions)]
-            if std::env::var("HOURSTEP_SPIKE_AUTO_OVERLAY").is_ok() {
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    use std::time::Duration;
-
-                    /// 첫 표시까지 — 전체화면에 진입할 여유
-                    const FIRST_DELAY: Duration = Duration::from_secs(8);
-                    /// 카드가 떠 있는 시간
-                    const VISIBLE: Duration = Duration::from_secs(8);
-                    /// 다음 표시까지 쉬는 시간 (주기 = VISIBLE + IDLE)
-                    const IDLE: Duration = Duration::from_secs(12);
-
-                    println!(
-                        "[spike] 자동 오버레이 모드 — {}초 뒤 첫 표시, 이후 {}초 표시 / {}초 대기 반복",
-                        FIRST_DELAY.as_secs(),
-                        VISIBLE.as_secs(),
-                        IDLE.as_secs()
-                    );
-                    std::thread::sleep(FIRST_DELAY);
-
-                    loop {
-                        overlay::trigger(&handle);
-                        std::thread::sleep(VISIBLE);
-                        if let Err(e) = overlay::hide_overlay(handle.clone()) {
-                            eprintln!("[spike] hide 실패: {e}");
-                        }
-                        std::thread::sleep(IDLE);
-                    }
-                });
+            if let Some(script) = debug_cmd::script_from_args() {
+                debug_cmd::spawn(app.handle(), script);
             }
 
             Ok(())

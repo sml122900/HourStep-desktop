@@ -58,16 +58,16 @@ CompletionLog { behaviorId, scheduledAt, action: 'done' | 'snoozed' | 'skipped',
 Windows 11 데스크톱 (개발 PC = 도그푸딩 기기). 실행: `pnpm tauri dev` / 빌드: `pnpm tauri build`
 
 ## 검증 정책
-- AI 자동 검증을 최대한 활용한다. 우선순위:
-  1. **프로그램적 상태 검사** — 창 핸들·스타일·좌표(`EnumWindows`/`GetWindowLongW`), 레지스트리, 프로세스, stdout 로그
-  2. **앱 디버그 훅**(`--debug-cmd`)을 통한 직접 호출 검증 — **훅이 없으면 만들어서 검증한다**
-- **사용자 데스크톱 세션에 합성 입력(`SendInput` 등) 주입 금지.**
-  클릭 수준 E2E가 필요하면 Windows Sandbox / VM 격리 환경에서만 한다
+- AI 자동 검증을 최대한 활용한다. 우선순위: ① 프로그램적 상태 검사(창/레지스트리/프로세스/로그)
+  ② 앱 디버그 훅(--debug-cmd)을 통한 직접 호출 검증 — 훅이 없으면 만들어서 검증한다
+- 사용자 데스크톱 세션에 합성 입력(SendInput 등) 주입은 금지.
+  클릭 수준 E2E가 필요하면 Windows Sandbox/VM 격리 환경에서만
+- 재부팅·지각 판단(화면에 실제로 보이는가)만 사용자 수동 확인으로 남긴다
+
+### 운영 세부 (위 정책의 해석)
 - 화면 캡처(`CopyFromScreen` 등)는 읽기 전용이라 허용. 단 DWM 합성·하드웨어 오버레이 때문에
-  캡처와 실제 화면이 다를 수 있으므로 **캡처는 증거이지 최종 판정이 아니다**
-- 다음 둘만 사용자 수동 확인으로 남긴다:
-  - **재부팅**이 필요한 것
-  - **지각 판단** — 실제로 눈에 보이는가, 애니메이션이 자연스러운가, 방해되지 않는가
+  캡처와 실제 화면이 다를 수 있으므로 **캡처는 증거이지 최종 판정이 아니다** — 지각 판단은 여전히 사용자 몫
+- `PostMessage(WM_CLOSE)` 같은 창 메시지 직접 전송은 합성 입력이 아니므로 허용
 - 자동 검증 결과를 문서에 적을 때는 **어떤 방법으로 얻었는지** 함께 남긴다
   (금지된 방법으로 얻은 과거 근거는 재검증 대상으로 표시)
 
@@ -86,9 +86,16 @@ src-tauri/src/windows.rs                    메인/설정 창 표시·숨김 헬
 ## 개발 메모
 - 오버레이 창에 `window.show()` / `window.hide()` 직접 호출 금지.
   반드시 `show_overlay_noactivate` / `hide_overlay` 커맨드 경유 (이유: docs/decisions/0001)
-- 개발 빌드 스모크: `$env:HOURSTEP_SPIKE_AUTO_OVERLAY="1"; pnpm tauri dev`
-  → 사람 클릭 없이 8초 뒤 첫 표시, 이후 8초 표시 / 12초 대기 반복
-  → **`--debug-cmd` 디버그 훅으로 대체 예정** (검증 정책 참고). 훅이 생기면 이 환경변수는 제거
+- **자동 검증 훅** `--debug-cmd` (개발 빌드 전용, `src-tauri/src/debug_cmd.rs`).
+  `--` 를 **세 번** 써야 앱까지 전달된다 (pnpm 이 하나, tauri 가 하나 먹는다):
+  ```powershell
+  pnpm tauri dev -- -- -- --debug-cmd "wait:4000,dump,start-session,wait:1500,dump,quit"
+  ```
+  명령: `wait:<ms>` / `start-session` / `overlay-show` / `overlay-hide` /
+  `overlay-action:done|snoozed|skipped` / `settings-open` / `main-show` / `main-hide` /
+  `dump` / `quit`, 맨 끝에 `loop` 를 붙이면 무한 반복
+- 오버레이 표시 여부는 `overlay::is_visible()` 로 확인. `WebviewWindow::is_visible()` 은
+  raw Win32 로 show/hide 하는 탓에 항상 false 를 반환한다 (docs/decisions/0001)
 - pnpm 11+ 설정은 package.json 이 아니라 `pnpm-workspace.yaml` 에 둔다
 - 빌드 전제: Rust(stable-msvc) + **Windows SDK 컴포넌트**. SDK 없으면 `link.exe not found`
 

@@ -80,6 +80,17 @@ export default function OverlayWindow() {
     }
   }, [showCard])
 
+  // `--debug-cmd overlay-action:done` 이 버튼 클릭과 같은 경로를 타게 한다.
+  // 이벤트를 보내는 쪽(Rust)이 개발 빌드에서만 emit 하므로 릴리스에서는 절대 발생하지 않는다.
+  useEffect(() => {
+    const unlisten = listen<string>('overlay://debug-action', (event) => {
+      dismiss(event.payload as OverlayAction)
+    })
+    return () => {
+      void unlisten.then((fn) => fn())
+    }
+  }, [dismiss])
+
   return (
     // 창 전체는 투명. 카드 바깥은 그리지 않는다.
     <div className="overlay-root">

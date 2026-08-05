@@ -18,22 +18,40 @@ pnpm tauri dev
 | `[tray] …`, `[overlay] …`, `[app] …`, `[spike] …` | `pnpm tauri dev` 를 띄운 터미널 (Rust stdout) |
 | `[overlay] action = …` | 위 터미널 + 오버레이 창 devtools 콘솔 (우클릭 → 검사) |
 
-### 자동 오버레이 모드 (C 항목 필수)
+### `--debug-cmd` 디버그 훅
 
-전체화면에서는 트레이를 누를 수 없으므로 카드를 스스로 띄우는 모드를 쓴다.
+CLAUDE.md 「검증 정책」에 따라, 트레이/버튼 클릭이 필요한 시나리오는 합성 입력 대신
+**같은 핸들러를 직접 호출**해서 검증한다. 개발 빌드 전용(`#[cfg(debug_assertions)]`)이라
+릴리스 번들에는 들어가지 않는다.
+
+`--` 를 **세 번** 써야 앱까지 전달된다 (pnpm 이 하나, tauri 가 하나 먹는다):
 
 ```powershell
-$env:HOURSTEP_SPIKE_AUTO_OVERLAY = "1"
-pnpm tauri dev
+pnpm tauri dev -- -- -- --debug-cmd "wait:4000,dump,start-session,wait:1500,dump,quit"
 ```
 
-- 앱 시작 **8초 뒤 첫 표시**, 이후 **8초 표시 / 12초 대기**를 반복 (주기 20초)
-- 개발 빌드 전용 (`#[cfg(debug_assertions)]`). 릴리스 빌드에는 이 코드가 들어가지 않는다
-- 끝나면 반드시 해제하고 재시작:
-  ```powershell
-  Remove-Item Env:HOURSTEP_SPIKE_AUTO_OVERLAY
-  pnpm tauri dev
-  ```
+| 명령 | 동작 |
+| --- | --- |
+| `wait:<ms>` | 대기 |
+| `start-session` | 트레이 `▶ 작업 시작` 과 같은 핸들러 |
+| `overlay-show` / `overlay-hide` | 오버레이 표시 / 숨김 |
+| `overlay-action:done\|snoozed\|skipped` | 프론트엔드 `dismiss()` 를 그대로 태움 (버튼 클릭과 같은 경로) |
+| `settings-open` / `main-show` / `main-hide` | 창 조작 |
+| `dump` | 세 창의 표시 여부를 `[debug-cmd] dump <label>.visible=<bool>` 로 출력 |
+| `quit` | 트레이 `종료` 와 같은 경로 (`app.exit(0)`) |
+| `loop` | 맨 끝에 붙이면 전체 스크립트 무한 반복 |
+
+**C 항목(전체화면)** 은 전체화면에서 트레이를 누를 수 없으므로 반복 모드를 쓴다:
+
+```powershell
+pnpm tauri dev -- -- -- --debug-cmd "wait:8000,overlay-show,wait:8000,overlay-hide,wait:12000,loop"
+```
+
+훅의 한계:
+- **자기 프로세스 안에서만** 동작한다. 이미 떠 있는 다른 인스턴스에는 명령을 못 보낸다
+  (그러려면 single-instance 플러그인 + argv 전달 필요 — D3 범위)
+- **"실제 마우스 클릭이 `WS_EX_NOACTIVATE` 창에 전달되는가"는 증명할 수 없다.**
+  그건 격리 환경(Windows Sandbox/VM) E2E 의 몫이다
 
 > ⚠️ **중복 실행 방지가 아직 없다.** dev 인스턴스와 설치 버전을 동시에 켜면 트레이 아이콘이 두 개 생기고
 > 어느 쪽 로그인지 헷갈린다. 항상 한 쪽만 켤 것.
@@ -130,14 +148,17 @@ pnpm tauri dev
 
 4. 트레이 우클릭 → **종료**
 
-- [ ] **E-4** 트레이 아이콘이 사라지고, 작업 관리자에서 프로세스도 사라진다 (터미널에 `[tray] 종료`)
+- [x] **E-4** 프로세스가 완전히 종료된다
+  → **`--debug-cmd quit` 으로 자동 검증 완료** (같은 `app.exit(0)` 경로)
+- [ ] **E-4'** 트레이 **아이콘이 화면에서 사라진다** — 지각 판단이라 사용자 확인 몫
 
 ---
 
 ## F. "작업 시작" 범위 경계 확인 (1분)
 
-- [ ] **F-1** 트레이 → `▶ 작업 시작` → 화면에 아무 일도 안 일어나고 터미널에
+- [x] **F-1** 트레이 → `▶ 작업 시작` → 화면에 아무 일도 안 일어나고 터미널에
   `[tray] 작업 시작 (placeholder — D1에서 구현)` 로그만 찍힌다
+  → **`--debug-cmd start-session` 으로 자동 검증 완료** (전후 `dump` 동일)
 
 > 세션이 시작되거나 타이머가 도는 등 다른 동작이 있으면 **D0 범위 초과**이므로 보고할 것.
 
@@ -185,9 +206,10 @@ pnpm tauri dev
 | --- | --- | --- | --- |
 | **B-1** 카드가 브라우저 위에 표시 | ✅ | 캡처 | Chrome/YouTube 위에 아이콘·문구·버튼 3개 정상 렌더링 |
 | **B-2** 포커스 미탈취 (표시 시) | ✅ | 상태 검사 | 표시 전후 `GetForegroundWindow` 불변 |
-| **B-2'** 포커스 미탈취 (클릭 시) | ⚠️ 재검증 | **SendInput** | 클릭해도 foreground 불변 (`WS_EX_NOACTIVATE`). 근거 방법이 금지됨 |
+| **B-2'** 포커스 미탈취 (클릭 시) | ⏳ 격리환경 | ~~SendInput~~ | 클릭해도 foreground 불변. 근거 방법이 금지됨 → Sandbox/VM E2E 로 재검증 |
 | **B-3** Alt+Tab 제외 | ✅ | 상태 검사 | `WS_EX_TOOLWINDOW` 설정 + `WS_EX_APPWINDOW` 해제 → 후보 판정 False (메모장은 True 로 로직 검증) |
-| **B-4** 버튼 클릭 → 로그 → 사라짐 | ⚠️ 재검증 | **SendInput** | `[overlay] action = done` → `[overlay] hide` → `IsWindowVisible=False`. `--debug-cmd` 로 재검증 필요 |
+| **B-4a** 액션 체인 (로그 → 슬라이드아웃 → 숨김) | ✅ | `--debug-cmd` | `done`/`snoozed`/`skipped` 3종 모두 각각 로그가 찍히고 `dump overlay.visible` 이 true→false |
+| **B-4b** 실제 마우스 클릭 전달 | ⏳ 격리환경 | — | `WS_EX_NOACTIVATE` 창에 클릭이 실제로 닿는지는 훅으로 증명 불가. Sandbox/VM E2E 몫 |
 | **B-5** 유령 사각형 회귀 | ✅ | 히트테스트 | 숨긴 뒤 같은 좌표가 실제 Chrome 을 반환 |
 | **C-2** borderless 전체화면(F11) 위 | ✅ | 캡처 + 상태 검사 | 대상 창은 TOPMOST 아님. F11 전송은 제가 띄운 테스트 창 대상 |
 | **C-1** Fullscreen API(유튜브 F) 위 | ⏳ 미검증 | — | 자동화 셋업 실패. Chrome 기준 C-2 와 동일한 fullscreen 창 상태라 통과 가능성이 높지만 **실측 필요** |
@@ -195,8 +217,8 @@ pnpm tauri dev
 | **D** 듀얼 모니터 | — 해당 없음 | 상태 검사 | `Screen.AllScreens` = 1개 (`\\.\DISPLAY1` 1920×1080, DPI 96) |
 | **E-1/E-2** 창 닫기 → 상주 | ✅ | `WM_CLOSE` + 프로세스 | 창 숨김 + 프로세스 생존. `PostMessage` 는 합성 입력이 아니라 창 메시지라 정책상 허용 |
 | **E-3** 닫은 뒤 알림 동작 | ✅ | 상태 검사 | 메인 창이 숨겨진 상태에서 위 B 항목 전부 통과 |
-| **E-4** 트레이 종료 | ⏳ 미검증 | — | 트레이 클릭 필요 → `--debug-cmd quit` 로 대체 가능 |
-| **F-1** 작업 시작 placeholder | ⏳ 미검증 | — | 트레이 클릭 필요 → `--debug-cmd start-session` 로 대체 가능 |
+| **E-4** 트레이 종료 | ✅ | `--debug-cmd` | `quit` 후 `Get-Process hourstep-desktop` 결과 없음 (프로세스 완전 종료) |
+| **F-1** 작업 시작 placeholder | ✅ | `--debug-cmd` | `start-session` 전후 `dump` 가 완전히 동일 — 로그 한 줄 외 창 상태 변화 없음 |
 | **A** 재부팅 자동 상주 | ⏳ 미검증 | — | 재부팅 필요 — 정책상 사용자 몫 |
 
 ### 추가로 확정된 사실
