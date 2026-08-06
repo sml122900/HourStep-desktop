@@ -4,26 +4,28 @@
 //! 트레이 클릭이나 마우스 클릭이 필요한 시나리오를 **같은 핸들러를 직접 호출**해서 대체한다.
 //!
 //! ```powershell
-//! # 트레이 [작업 시작] 이 콘솔 로그만 찍는지 (F-1)
-//! pnpm tauri dev -- -- --debug-cmd "wait:3000,dump,start-session,wait:1500,dump,quit"
+//! # D1 코어 루프: 세션 시작 → 30분 점프 → 물마시기 카드 → 완료 → 종료
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:4000,start-session,wait:1500,tick:1800000,wait:2500,dump,done,wait:1500,dump,end-session,wait:1000,dump,quit"
+//!
+//! # 스누즈 병합: 57분 시점에 스누즈 → 3분 뒤(60분) 정규와 겹쳐 병합되어야 한다
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:4000,start-session,tick:3420000,wait:2500,snoozed,wait:1500,tick:180000,wait:3000,dump,quit"
 //!
 //! # 오버레이 표시 → 완료 액션 → 숨김 (B-4 의 액션 체인)
-//! pnpm tauri dev -- -- --debug-cmd "wait:3000,overlay-show,wait:2000,overlay-action:done,wait:1500,dump,quit"
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:3000,overlay-show,wait:2000,done,wait:1500,dump,quit"
 //!
 //! # 전체화면 테스트용 반복 표시 (C 항목)
-//! pnpm tauri dev -- -- --debug-cmd "wait:8000,overlay-show,wait:8000,overlay-hide,wait:12000,loop"
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:8000,overlay-show,wait:8000,overlay-hide,wait:12000,loop"
 //! ```
 //!
 //! 한계: 이 훅은 **자기 프로세스 안에서만** 동작한다. 이미 떠 있는 다른 인스턴스에는 명령을
-//! 보낼 수 없다 (그러려면 single-instance 플러그인 + argv 전달이 필요 — D3 범위).
-//! 또한 "실제 마우스 클릭이 `WS_EX_NOACTIVATE` 창에 전달되는가"는 이 훅으로 증명할 수 없다.
-//! 그건 격리 환경(Windows Sandbox/VM) E2E 의 몫이다.
+//! 보낼 수 없다. D1 에서 single-instance 를 넣었으므로 dev 인스턴스가 이미 떠 있으면
+//! 두 번째 실행은 그냥 종료된다 — 스크립트를 돌리기 전에 기존 인스턴스를 반드시 끌 것.
 
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{overlay, tray, windows};
+use crate::{overlay, session, windows};
 
 pub const FLAG: &str = "--debug-cmd";
 
@@ -84,19 +86,28 @@ fn run_step(app: &AppHandle, step: &str) {
             std::thread::sleep(Duration::from_millis(ms));
         }
 
-        // 트레이 [▶ 작업 시작] 과 완전히 같은 핸들러
-        "start-session" => tray::start_session_placeholder(),
+        // 트레이 [▶ 작업 시작] / [■ 작업 종료] 와 완전히 같은 핸들러
+        "start-session" => session::start(app),
+        "end-session" => session::end(app),
 
-        "overlay-show" => overlay::trigger(app),
+        // 가상 시각을 앞으로 감는다. 스케줄러의 now 주입과 같은 경로 —
+        // 50분 간격 알림을 실제로 50분 기다리지 않고 검증하기 위한 것.
+        "tick" => {
+            let ms: i64 = arg.and_then(|a| a.parse().ok()).unwrap_or(60_000);
+            session::advance_clock(ms);
+        }
+
+        "overlay-show" => overlay::trigger(app, arg.unwrap_or(overlay::TEST_BEHAVIOR_ID)),
         "overlay-hide" => {
             if let Err(e) = overlay::hide_overlay(app.clone()) {
                 eprintln!("[debug-cmd] overlay-hide 실패: {e}");
             }
         }
 
-        // 프론트엔드의 dismiss() 를 그대로 태운다 (로그 → 슬라이드 아웃 → hide 체인 검증)
-        "overlay-action" => {
-            let action = arg.unwrap_or("done");
+        // 프론트엔드의 dismiss() 를 그대로 태운다 (로그 → 슬라이드 아웃 → hide 체인 검증).
+        // `done` / `snoozed` / `skipped` 는 자주 쓰므로 별칭을 준다.
+        "overlay-action" | "done" | "snoozed" | "skipped" => {
+            let action = if cmd == "overlay-action" { arg.unwrap_or("done") } else { cmd };
             if let Err(e) = app.emit_to(overlay::OVERLAY_LABEL, "overlay://debug-action", action) {
                 eprintln!("[debug-cmd] overlay-action 전송 실패: {e}");
             }
@@ -122,8 +133,18 @@ fn run_step(app: &AppHandle, step: &str) {
     }
 }
 
-/// 창 상태를 기계가 파싱하기 쉬운 형태로 찍는다.
+/// 창·세션 상태를 기계가 파싱하기 쉬운 형태로 찍는다.
 fn dump(app: &AppHandle) {
+    let now = session::now_ms();
+    match session::started_at(app) {
+        Some(started) => println!(
+            "[debug-cmd] dump session.active=true startedAt={started} elapsedMs={}",
+            now - started
+        ),
+        None => println!("[debug-cmd] dump session.active=false"),
+    }
+    println!("[debug-cmd] dump clock.now={now}");
+
     for label in [windows::MAIN_LABEL, windows::SETTINGS_LABEL] {
         let visible = app
             .get_webview_window(label)

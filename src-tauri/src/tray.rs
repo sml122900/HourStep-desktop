@@ -1,27 +1,37 @@
 //! 트레이 아이콘 + 메뉴. 앱의 상주 진입점.
 
+use std::sync::Mutex;
+
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle,
+    AppHandle, Manager, Wry,
 };
 
 use crate::overlay;
+use crate::session;
 use crate::windows::{show_settings_window, show_window};
 
-const ID_START_SESSION: &str = "start_session";
+const ID_SESSION: &str = "session_toggle";
 const ID_TEST_NOTIFICATION: &str = "test_notification";
 const ID_SETTINGS: &str = "settings";
 const ID_QUIT: &str = "quit";
 
+const LABEL_START: &str = "▶ 작업 시작";
+const LABEL_END: &str = "■ 작업 종료";
+
+/// 세션 토글 메뉴 항목. 라벨을 바꾸려면 핸들을 들고 있어야 한다.
+struct SessionMenuItem(Mutex<MenuItem<Wry>>);
+
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let start = MenuItem::with_id(app, ID_START_SESSION, "▶ 작업 시작", true, None::<&str>)?;
+    let session_item = MenuItem::with_id(app, ID_SESSION, LABEL_START, true, None::<&str>)?;
     let test = MenuItem::with_id(app, ID_TEST_NOTIFICATION, "테스트 알림", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, ID_SETTINGS, "설정", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, ID_QUIT, "종료", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[&start, &test, &settings, &sep, &quit])?;
+    let menu = Menu::with_items(app, &[&session_item, &test, &settings, &sep, &quit])?;
+    app.manage(SessionMenuItem(Mutex::new(session_item)));
 
     TrayIconBuilder::with_id("hourstep-tray")
         .icon(
@@ -49,18 +59,24 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// D0 placeholder — 실제 세션 시작은 D1 범위.
-/// `--debug-cmd start-session` 이 이 함수를 그대로 호출하므로 자동 검증과 트레이 동작이 어긋나지 않는다.
-pub fn start_session_placeholder() {
-    println!("[tray] 작업 시작 (placeholder — D1에서 구현)");
+/// 세션 상태에 맞춰 토글 항목 라벨을 바꾼다. `session` 모듈이 부른다.
+pub fn set_session_active(app: &AppHandle, active: bool) {
+    let label = if active { LABEL_END } else { LABEL_START };
+    if let Some(item) = app.try_state::<SessionMenuItem>() {
+        if let Ok(guard) = item.0.lock() {
+            let _ = guard.set_text(label);
+        }
+    }
 }
 
 fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match event.id.as_ref() {
-        ID_START_SESSION => start_session_placeholder(),
+        ID_SESSION => {
+            session::toggle(app);
+        }
         ID_TEST_NOTIFICATION => {
             println!("[tray] 테스트 알림 트리거");
-            overlay::trigger(app);
+            overlay::trigger(app, overlay::TEST_BEHAVIOR_ID);
         }
         ID_SETTINGS => show_settings_window(app),
         ID_QUIT => {

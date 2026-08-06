@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "메인 / 설정 / 오버레이 창 공통 권한 (Phase D0)",
+  "description": "메인 / 설정 / 오버레이 창 공통 권한 (Phase D1)",
   "windows": ["main", "settings", "overlay"],
   "permissions": [
     "core:default",
@@ -10,6 +10,8 @@
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:window:allow-scale-factor",
     "core:window:allow-set-always-on-top",
     "core:window:allow-outer-size",
     "core:window:allow-primary-monitor",

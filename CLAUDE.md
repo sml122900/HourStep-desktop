@@ -25,20 +25,27 @@
 8. UI 문구는 한국어, 상수 파일(src/constants/strings.ts)로 분리. 사용자가 직접 쓴 카피는 임의 수정 금지 — 우려가 있으면 지적만 하고 원문 유지
 
 ## 도메인 모델
+실제 정의는 `src/core/types.ts`. 시각은 전부 epoch ms(number) — Date 객체를 쓰지 않는다.
+
 ```ts
-WorkSession { id, startedAt, endedAt: string | null }        // 진행 중이면 endedAt null
+WorkSession { id, startedAt, endedAt: number | null }         // 진행 중이면 endedAt null
 Behavior {
-  id, name, icon,
-  rule: { type: 'interval', minutes: number }                // 세션 시작 기준 N분 간격
-      | { type: 'atElapsed', minutesList: number[] },        // 세션 경과 특정 시점들
-  intensity: 'toast' | 'card' | 'fullscreen',                // MVP는 card만 구현
-  enabled: boolean
+  id, label, emoji,
+  rule: { kind: 'interval', everyMs }                         // 세션 시작 기준 N ms 간격
+      | { kind: 'atElapsed', atMs },                          // 세션 경과 특정 시점 1회
+  intensity: 'toast' | 'card' | 'fullscreen',                 // MVP는 card만 구현
+  enabled: boolean,
+  countdownMs?: number                                        // 완료 후 제안할 카운트다운
 }
-Occurrence { behaviorId, scheduledAt }                        // 스케줄러 출력
-CompletionLog { behaviorId, scheduledAt, action: 'done' | 'snoozed' | 'skipped', at }
+Occurrence { behaviorId, dueAt, origin: 'regular' | 'snooze' }  // 스케줄러 출력
+CompletionLog { occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at }
 ```
-- 스케줄러 시그니처: `computeNextOccurrences(session, behaviors, now, horizon): Occurrence[]`
-- 스누즈(3분 뒤)는 단발 Occurrence 재삽입. 스누즈가 다음 정규 알림과 5분 이내 겹치면 병합(정규 것만 유지)
+- 스케줄러 시그니처: `computeNextOccurrences(session, behaviors, now, horizonMs, snoozes?): Occurrence[]`
+  - `horizonMs` 는 now 로부터의 조회 **길이**(ms). 반환은 `[now, now+horizonMs]` 구간, dueAt 오름차순
+  - `interval` 첫 발화는 `startedAt + everyMs`. 0분에는 뜨지 않는다
+- `occurrenceId(o)` = `` `${behaviorId}@${dueAt}` `` — CompletionLog 가 참조하는 안정적 식별자
+- 스누즈(3분 뒤)는 단발 Occurrence 재삽입. 스누즈가 **다음(뒤쪽) 정규 알림**과 5분 이내 겹치면
+  병합(정규 것만 유지). **이미 지나간 정규와는 병합하지 않는다** — 그러면 스누즈가 통째로 사라진다
 
 ## 프리셋 루틴 (MVP 내장 1종)
 - 🧘 스트레칭: 50분 간격, 완료 시 1분 카운트다운 제안
@@ -46,8 +53,9 @@ CompletionLog { behaviorId, scheduledAt, action: 'done' | 'snoozed' | 'skipped',
 - 👀 눈휴식(눈감고 1분): 60분 간격
 
 ## Phase 로드맵
-- **D0 (현재)**: 스캐폴딩 + 트레이 상주 + 자동실행 + 오버레이 스파이크 ← 지금 여기
-- **D1**: 세션 시작/종료 + 스케줄러 순수 함수(vitest) + 오버레이 카드 3액션 + 프리셋 루틴
+- **D0 (완료)**: 스캐폴딩 + 트레이 상주 + 자동실행 + 오버레이 스파이크
+- **D1 (완료)**: 세션 시작/종료 + 스케줄러 순수 함수(vitest) + 오버레이 카드 3액션 + 프리셋 루틴
+  + 투명영역 클릭 통과 + single-instance
 - **D2**: SQLite 통계(오늘/주간 작업시간·실천율) + 설정 화면 + 세션 미시작 리마인더
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
@@ -80,12 +88,22 @@ Windows 11 데스크톱 (개발 PC = 도그푸딩 기기). 실행: `pnpm tauri d
 index.html / overlay.html / settings.html   창별 Vite 엔트리 (rollupOptions.input)
 src/constants/strings.ts                    UI 문구 (한국어)
 src/core/                                   IO 없는 순수 모듈 — React·Tauri import 금지 (eslint로 강제)
+  types.ts / scheduler.ts / presets.ts / overlayPosition.ts (+ *.test.ts)
 src/windows/{main,overlay,settings}/        창별 React 앱
+  overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
+src-tauri/src/session.rs                    세션 상태 + 1초 tick + 가상 시각
 src-tauri/src/tray.rs                       트레이 아이콘 + 메뉴
 src-tauri/src/overlay.rs                    오버레이 표시/숨김 (Win32 직접 호출)
 src-tauri/src/windows.rs                    메인/설정 창 표시·숨김 헬퍼
+src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 쓰면 여기 추가해야 한다
 ```
+
+### 역할 분담: Rust = 시계, TS = 판단
+알림 주기 신호는 Rust 가 1초 tick(`app://tick`)으로 준다. 숨겨진 웹뷰에서는 Chromium 이
+`setTimeout`/`setInterval` 을 분 단위로 스로틀링해서 JS 타이머로는 50분 뒤 알림을 신뢰할 수 없다.
+무엇이 언제 뜰지는 오버레이 웹뷰의 TS 가 `computeNextOccurrences` 로 계산한다.
+**세션 상태(startedAt)의 단일 출처는 Rust**(`session.rs`), CompletionLog 는 TS 인메모리(D2에서 SQLite).
 
 ## 개발 메모
 - 오버레이 창에 `window.show()` / `window.hide()` 직접 호출 금지.
@@ -95,13 +113,28 @@ src-tauri/src/windows.rs                    메인/설정 창 표시·숨김 헬
   ```powershell
   pnpm tauri dev -- -- -- --debug-cmd "wait:4000,dump,start-session,wait:1500,dump,quit"
   ```
-  명령: `wait:<ms>` / `start-session` / `overlay-show` / `overlay-hide` /
-  `overlay-action:done|snoozed|skipped` / `settings-open` / `main-show` / `main-hide` /
+  명령: `wait:<ms>` / `start-session` / `end-session` / `tick:<ms>` /
+  `overlay-show[:<behaviorId>]` / `overlay-hide` / `done` / `snoozed` / `skipped`
+  (= `overlay-action:<action>`) / `settings-open` / `main-show` / `main-hide` /
   `dump` / `quit`, 맨 끝에 `loop` 를 붙이면 무한 반복
+- **`tick:<ms>` 는 가상 시각을 앞으로 감는다.** 50분 간격 알림을 50분 기다리지 않고 검증하는 수단이고,
+  스케줄러의 `now` 주입과 완전히 같은 경로다. 단 **정확히 due 시각에 착지해야 카드가 뜬다** —
+  `STALE_MS`(2분)보다 밀린 occurrence 는 소진 처리되어 표시되지 않는다 (몰아 띄우기 방지)
+- **single-instance 가 켜져 있다.** dev 인스턴스가 이미 떠 있으면 두 번째 실행은 조용히 죽는다.
+  스크립트를 돌리기 전에 `Get-Process hourstep-desktop` 로 확인할 것
 - 오버레이 표시 여부는 `overlay::is_visible()` 로 확인. `WebviewWindow::is_visible()` 은
   raw Win32 로 show/hide 하는 탓에 항상 false 를 반환한다 (docs/decisions/0001)
+- 오버레이 창은 표시할 때마다 **카드 실크기로 리사이즈**된다 (`OverlayWindow.fitWindow`).
+  투명 영역이 남으면 그만큼 하위 창의 클릭이 막히기 때문. 그래서 카드 CSS 에 바깥 여백·드롭섀도를
+  주면 안 된다 — 창 밖이라 잘리고, 여백은 그대로 죽은 영역이 된다
+- `fitWindow` 는 **표시가 먼저, 측정이 나중**이다. 숨겨진 WebView2 는 레이아웃을 안 돌려서
+  `getBoundingClientRect()` 가 전부 0으로 나온다
 - pnpm 11+ 설정은 package.json 이 아니라 `pnpm-workspace.yaml` 에 둔다
 - 빌드 전제: Rust(stable-msvc) + **Windows SDK 컴포넌트**. SDK 없으면 `link.exe not found`
+- **dev 서버 포트는 1420 이 아니라 5183** (HMR 5184). Windows(Hyper-V/WinNAT)가 재부팅마다 임의
+  TCP 구간을 예약하는데 이 PC 에서 1336–1435 가 잡혀 `listen EACCES` 로 죽었다.
+  또 걸리면 `netsh interface ipv4 show excludedportrange protocol=tcp` 로 빈 번호를 찾아
+  `vite.config.ts` + `src-tauri/tauri.conf.json` 의 `devUrl` 을 **같이** 고친다
 
 ## 진행 상황
 → **`STATUS.md`** 참고. 진행 상황·남은 확인 항목·미결 결정은 이 파일이 아니라 STATUS.md에 쓴다.

@@ -28,15 +28,21 @@ export default defineConfig(async () => ({
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
+  //
+  // 기본값 1420/1421 을 쓰지 않는 이유: Windows(Hyper-V/WinNAT)가 재부팅마다 임의의
+  // TCP 구간을 예약하는데, 이 PC 에서 1336–1435 가 잡혀 `listen EACCES` 로 죽었다.
+  // 확인: netsh interface ipv4 show excludedportrange protocol=tcp
+  // 5183/5184 도 언젠가 예약 구간에 걸리면 같은 방식으로 비어 있는 번호로 옮기면 된다.
+  // 바꿀 때는 src-tauri/tauri.conf.json 의 build.devUrl 도 같이 고칠 것.
   server: {
-    port: 1420,
+    port: 5183,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: 'ws',
           host,
-          port: 1421,
+          port: 5184,
         }
       : undefined,
     watch: {

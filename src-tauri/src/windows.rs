@@ -33,9 +33,9 @@ pub fn open_settings_window(app: AppHandle) {
     show_settings_window(&app);
 }
 
-/// 메인 창의 "작업 시작" placeholder — 트레이 메뉴와 같은 동작(콘솔 로그만).
+/// 메인 창의 "테스트 알림 띄우기" — 트레이 메뉴와 같은 경로.
 #[tauri::command]
 pub fn trigger_test_overlay(app: AppHandle) {
     println!("[main] 테스트 알림 트리거");
-    crate::overlay::trigger(&app);
+    crate::overlay::trigger(&app, crate::overlay::TEST_BEHAVIOR_ID);
 }

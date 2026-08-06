@@ -13,22 +13,26 @@ use tauri::{AppHandle, Manager};
 
 pub const OVERLAY_LABEL: &str = "overlay";
 
+/// 트레이 [테스트 알림] 이 띄우는 행동. 스케줄과 무관하게 즉시 한 장 보여주는 용도.
+pub const TEST_BEHAVIOR_ID: &str = "stretch";
+
 /// `WS_EX_NOACTIVATE` 를 붙이면 오버레이 카드를 **클릭해도** 포커스가 넘어오지 않는다.
 /// (마우스 이벤트는 정상 전달되지만 키보드 포커스는 뒤 창에 남는다.)
 /// 만약 특정 환경에서 버튼 클릭이 먹지 않으면 이 값을 false 로 바꿔 확인할 것 — D0 스파이크의 관찰 포인트.
 #[cfg(windows)]
 const KEEP_FOCUS_ON_CLICK: bool = true;
 
-/// 트레이/메인 창에서 오버레이 표시를 요청한다. 실제 위치 계산과 애니메이션은 프론트엔드가 담당.
-pub fn trigger(app: &AppHandle) {
+/// 특정 행동의 카드를 즉시 띄우라고 요청한다. 위치·크기·애니메이션은 프론트엔드가 담당.
+/// 정규 스케줄 발화는 이 경로가 아니라 오버레이 웹뷰가 tick 을 보고 스스로 띄운다.
+pub fn trigger(app: &AppHandle, behavior_id: &str) {
     use tauri::Emitter;
 
     if app.get_webview_window(OVERLAY_LABEL).is_none() {
         eprintln!("[overlay] '{OVERLAY_LABEL}' 창이 없습니다");
         return;
     }
-    println!("[overlay] show 요청");
-    if let Err(e) = app.emit_to(OVERLAY_LABEL, "overlay://show", ()) {
+    println!("[overlay] show 요청 behavior={behavior_id}");
+    if let Err(e) = app.emit_to(OVERLAY_LABEL, "overlay://show", behavior_id) {
         eprintln!("[overlay] show 이벤트 전송 실패: {e}");
     }
 }

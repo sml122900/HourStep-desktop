@@ -1,8 +1,11 @@
 #[cfg(debug_assertions)]
 mod debug_cmd;
 mod overlay;
+mod session;
 mod tray;
 mod windows;
+
+use std::sync::Mutex;
 
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
@@ -13,15 +16,24 @@ const AUTOSTART_FLAG: &str = "--autostart";
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // single-instance 는 반드시 첫 번째로 등록해야 한다 (플러그인 문서).
+        // 자동실행본이 이미 떠 있는데 사용자가 또 실행하면 알림이 2배로 뜨는 걸 막는다.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            println!("[app] 두 번째 인스턴스 감지 — 기존 창을 띄운다");
+            windows::show_window(app, windows::MAIN_LABEL);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),
         ))
+        .manage(session::SessionState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             overlay::show_overlay_noactivate,
             overlay::hide_overlay,
             overlay::log_overlay_action,
+            session::current_session,
+            session::log_completion,
             windows::hide_main_window,
             windows::open_settings_window,
             windows::trigger_test_overlay,
@@ -39,6 +51,7 @@ pub fn run() {
         })
         .setup(|app| {
             tray::build(app.handle())?;
+            session::spawn_tick(app.handle());
 
             let launched_by_autostart = std::env::args().any(|arg| arg == AUTOSTART_FLAG);
             if launched_by_autostart {
