@@ -60,5 +60,16 @@
 5. **키보드 조작 불가.** `WS_EX_NOACTIVATE` 때문에 카드가 키보드 포커스를 받지 않는다.
    `src-tauri/src/overlay.rs` 의 `KEEP_FOCUS_ON_CLICK` 로 뒤집을 수 있다
 6. **동시 due 는 큐로 밀린다.** 2분 이상 밀린 것은 소진 처리(`STALE_MS`)
-7. **카드 드롭섀도 없음.** 창이 카드 실크기라 바깥으로 번지는 그림자가 잘린다 (D1의 맞바꿈)
+7. **카드 드롭섀도 없음.** 창이 카드 실크기라 바깥으로 번지는 그림자가 잘린다
+   (D1의 맞바꿈 — `docs/decisions/0005`)
 8. **설정을 사람이 직접 파일로 고칠 수 없다.** SQLite 안에 있다 (`docs/decisions/0003`)
+
+## 결정 기록
+
+| # | 내용 | Phase |
+| --- | --- | --- |
+| [0001](docs/decisions/0001-overlay-show-hide-win32.md) | 오버레이 show/hide 는 raw Win32 로 (tao visible 캐시 우회) | D0 |
+| [0002](docs/decisions/0002-debug-cmd-hook.md) | GUI 자동 검증은 `--debug-cmd` 훅으로 (합성 입력 금지) | D0 |
+| [0003](docs/decisions/0003-settings-storage-sqlite.md) | 설정도 SQLite 에 (store 플러그인 대신) | D2 |
+| [0004](docs/decisions/0004-rust-clock-ts-judgment.md) | 시계는 Rust, 판단은 TS | D1 |
+| [0005](docs/decisions/0005-overlay-window-fits-card.md) | 오버레이 창을 카드 실크기로 (커서 폴링 대신) | D1 |

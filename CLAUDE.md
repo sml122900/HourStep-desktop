@@ -107,7 +107,7 @@ src-tauri/src/windows.rs                    메인/설정 창 표시·숨김 헬
 src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 쓰면 여기 추가해야 한다
 ```
 
-### 역할 분담: Rust = 시계, TS = 판단
+### 역할 분담: Rust = 시계, TS = 판단 (근거: `docs/decisions/0004`)
 알림 주기 신호는 Rust 가 1초 tick(`app://tick`)으로 준다. 숨겨진 웹뷰에서는 Chromium 이
 `setTimeout`/`setInterval` 을 분 단위로 스로틀링해서 JS 타이머로는 50분 뒤 알림을 신뢰할 수 없다.
 무엇이 언제 뜰지는 오버레이 웹뷰의 TS 가 `computeNextOccurrences` 로 계산한다.
@@ -146,9 +146,9 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
   스크립트를 돌리기 전에 `Get-Process hourstep-desktop` 로 확인할 것
 - 오버레이 표시 여부는 `overlay::is_visible()` 로 확인. `WebviewWindow::is_visible()` 은
   raw Win32 로 show/hide 하는 탓에 항상 false 를 반환한다 (docs/decisions/0001)
-- 오버레이 창은 표시할 때마다 **카드 실크기로 리사이즈**된다 (`OverlayWindow.fitWindow`).
-  투명 영역이 남으면 그만큼 하위 창의 클릭이 막히기 때문. 그래서 카드 CSS 에 바깥 여백·드롭섀도를
-  주면 안 된다 — 창 밖이라 잘리고, 여백은 그대로 죽은 영역이 된다
+- 오버레이 창은 표시할 때마다 **카드 실크기로 리사이즈**된다 (`OverlayWindow.fitWindow`,
+  근거: `docs/decisions/0005`). 투명 영역이 남으면 그만큼 하위 창의 클릭이 막히기 때문.
+  그래서 카드 CSS 에 바깥 여백·드롭섀도를 주면 안 된다 — 창 밖이라 잘리고, 여백은 죽은 영역이 된다
 - `fitWindow` 는 **표시가 먼저, 측정이 나중**이다. 숨겨진 WebView2 는 레이아웃을 안 돌려서
   `getBoundingClientRect()` 가 전부 0으로 나온다
 - pnpm 11+ 설정은 package.json 이 아니라 `pnpm-workspace.yaml` 에 둔다
@@ -157,6 +157,7 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
   TCP 구간을 예약하는데 이 PC 에서 1336–1435 가 잡혀 `listen EACCES` 로 죽었다.
   또 걸리면 `netsh interface ipv4 show excludedportrange protocol=tcp` 로 빈 번호를 찾아
   `vite.config.ts` + `src-tauri/tauri.conf.json` 의 `devUrl` 을 **같이** 고친다
+  (상세: `docs/troubleshooting/vite-port-eacces.md`)
 
 ## 진행 상황
 → **`STATUS.md`** 참고. 진행 상황·남은 확인 항목·미결 결정은 이 파일이 아니라 STATUS.md에 쓴다.
