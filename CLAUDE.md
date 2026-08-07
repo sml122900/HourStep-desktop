@@ -56,13 +56,18 @@ CompletionLog { occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at
 - **D0 (완료)**: 스캐폴딩 + 트레이 상주 + 자동실행 + 오버레이 스파이크
 - **D1 (완료)**: 세션 시작/종료 + 스케줄러 순수 함수(vitest) + 오버레이 카드 3액션 + 프리셋 루틴
   + 투명영역 클릭 통과 + single-instance
-- **D2**: SQLite 통계(오늘/주간 작업시간·실천율) + 설정 화면 + 세션 미시작 리마인더
+- **D2 (완료)**: SQLite 영속화 + 통계(오늘/최근 7일 작업시간·실천율) + 설정 화면
+  + 세션 미시작 리마인더
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
 
 ## 코딩 규칙
 - TypeScript strict. 스케줄 계산 로직은 src/core/ 아래 순수 모듈로 격리 (React·Tauri import 금지)
 - 시간 계산 테스트 필수 케이스: 세션 중간 시작(now가 세션 도중), 스누즈 병합, 자정 넘는 세션, 행동 disabled
+- **스누즈 병합에 `Math.abs()` 를 쓰지 말 것.** 병합은 방향성이 있다 — "다음(뒤쪽) 정규"와만 병합한다.
+  abs 로 하면 30분 알림을 스누즈한 33분이 방금 지나간 30분 정규와 겹쳤다고 지워져 스누즈가 증발한다
+- 통계·설정 반영도 스케줄러와 같은 규칙이다. 순수 함수로 `src/core/` 에 두고 `now`·구간을 인자로 받는다.
+  DB 접근은 `src/data/` 어댑터에만 — `src/core/` 는 IO 금지 (eslint 강제)
 - 오버레이 창은 별도 Tauri window로 관리. 메인 창 닫기 = 트레이로 숨김 (앱 종료 아님)
 - 각 Phase 완료 시 docs/daily/에 작업 일지, 기술 결정은 docs/decisions/에 기록
 
@@ -88,10 +93,13 @@ Windows 11 데스크톱 (개발 PC = 도그푸딩 기기). 실행: `pnpm tauri d
 index.html / overlay.html / settings.html   창별 Vite 엔트리 (rollupOptions.input)
 src/constants/strings.ts                    UI 문구 (한국어)
 src/core/                                   IO 없는 순수 모듈 — React·Tauri import 금지 (eslint로 강제)
-  types.ts / scheduler.ts / presets.ts / overlayPosition.ts (+ *.test.ts)
+  types.ts / scheduler.ts / presets.ts / stats.ts / settings.ts / overlayPosition.ts (+ *.test.ts)
+src/data/                                   IO 계층 — DB 접근은 전부 여기를 지난다
+  db.ts                                     SQLite 어댑터 / range.ts 벽시계 구간·포맷
 src/windows/{main,overlay,settings}/        창별 React 앱
-  overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog)이 여기 산다
+  overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog·리마인더)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
+src-tauri/src/db.rs                         SQLite 스키마·마이그레이션 (읽기/쓰기는 TS 어댑터)
 src-tauri/src/session.rs                    세션 상태 + 1초 tick + 가상 시각
 src-tauri/src/tray.rs                       트레이 아이콘 + 메뉴
 src-tauri/src/overlay.rs                    오버레이 표시/숨김 (Win32 직접 호출)
@@ -103,7 +111,17 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
 알림 주기 신호는 Rust 가 1초 tick(`app://tick`)으로 준다. 숨겨진 웹뷰에서는 Chromium 이
 `setTimeout`/`setInterval` 을 분 단위로 스로틀링해서 JS 타이머로는 50분 뒤 알림을 신뢰할 수 없다.
 무엇이 언제 뜰지는 오버레이 웹뷰의 TS 가 `computeNextOccurrences` 로 계산한다.
-**세션 상태(startedAt)의 단일 출처는 Rust**(`session.rs`), CompletionLog 는 TS 인메모리(D2에서 SQLite).
+**세션 상태(startedAt)의 단일 출처는 Rust**(`session.rs`), 기록·설정의 단일 출처는 SQLite.
+
+### 저장소
+`%APPDATA%\com.hourstep.desktop\hourstep.db` (SQLite, WAL). 스키마·마이그레이션은
+`src-tauri/src/db.rs` 가 소유하고, **읽기/쓰기는 `src/data/db.ts` 어댑터만** 한다.
+설정도 같은 파일의 `settings` 테이블에 JSON 한 덩어리로 넣는다 (근거: `docs/decisions/0003`).
+- 저장된 설정을 그대로 믿지 않는다 — `normalizeSettings()` 로 범위·타입을 정리한 뒤 쓴다.
+  설정 창은 사용자 입력이 들어오는 신뢰 경계다
+- 앱이 강제 종료되면 `ended_at IS NULL` 세션이 남는다. 기동 시 `closeDanglingSessions(bootedAt)`
+  가 **마지막 기록 시각**으로 닫는다. `bootedAt` 인자는 필수 — 없으면 기동 직후 시작한
+  살아 있는 세션까지 닫아버린다
 
 ## 개발 메모
 - 오버레이 창에 `window.show()` / `window.hide()` 직접 호출 금지.
@@ -116,7 +134,11 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
   명령: `wait:<ms>` / `start-session` / `end-session` / `tick:<ms>` /
   `overlay-show[:<behaviorId>]` / `overlay-hide` / `done` / `snoozed` / `skipped`
   (= `overlay-action:<action>`) / `settings-open` / `main-show` / `main-hide` /
-  `dump` / `quit`, 맨 끝에 `loop` 를 붙이면 무한 반복
+  `db-dump` / `set-interval:<behaviorId>=<분>` / `dump` / `quit`,
+  맨 끝에 `loop` 를 붙이면 무한 반복
+- `db-dump` / `set-interval` 은 **DB 를 어댑터만 읽는다**는 규칙 때문에 Rust 가 직접 처리하지 않고
+  오버레이 웹뷰에 요청한다. 결과는 `log_debug` 를 타고 `[debug] …` 로 stdout 에 나온다.
+  `set-interval` 은 설정 창과 **같은 함수**(`saveSettingsAndBroadcast`)를 탄다
 - **`tick:<ms>` 는 가상 시각을 앞으로 감는다.** 50분 간격 알림을 50분 기다리지 않고 검증하는 수단이고,
   스케줄러의 `now` 주입과 완전히 같은 경로다. 단 **정확히 due 시각에 착지해야 카드가 뜬다** —
   `STALE_MS`(2분)보다 밀린 occurrence 는 소진 처리되어 표시되지 않는다 (몰아 띄우기 방지)

@@ -39,6 +39,20 @@ export const OVERLAY = {
   COUNTDOWN_ACCEPT: '⏱ 좋아요',
   COUNTDOWN_DECLINE: '괜찮아요',
   COUNTDOWN_STOP: '그만하기',
+
+  /** 세션 미시작 리마인더 — 세션당 한 번만 뜬다 */
+  IDLE_ICON: '👋',
+  IDLE_MESSAGE: '작업 중이신가요? 세션을 시작하면 휴식을 챙겨드릴게요',
+  IDLE_START: '▶ 작업 시작',
+  IDLE_LATER: '나중에',
+
+  /** 세션 종료 요약 */
+  SUMMARY_ICON: '📊',
+  SUMMARY_TITLE: '수고하셨어요',
+  SUMMARY_WORKED: '작업시간',
+  SUMMARY_RATE: '실천율',
+  SUMMARY_NO_RECORD: '이번 세션에는 기록된 휴식이 없어요',
+  SUMMARY_CLOSE: '닫기',
 } as const
 
 export const SETTINGS = {
@@ -46,14 +60,33 @@ export const SETTINGS = {
   AUTOSTART_LABEL: '컴퓨터 켤 때 자동으로 시작',
   AUTOSTART_HINT: '자동 실행 시 창을 띄우지 않고 트레이에만 조용히 상주합니다.',
   AUTOSTART_ERROR: '자동 실행 설정을 변경하지 못했습니다.',
+
+  BEHAVIORS_TITLE: '휴식 루틴',
+  BEHAVIORS_HINT: '변경하면 진행 중인 세션에도 바로 반영됩니다.',
+  INTERVAL_SUFFIX: '분마다',
+
+  IDLE_TITLE: '세션 미시작 알림',
+  IDLE_LABEL: '작업 시작을 잊었을 때 한 번 알려주기',
+  IDLE_SUFFIX: '분 후',
+
+  SAVE_ERROR: '설정을 저장하지 못했습니다.',
 } as const
 
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D0 — 상주 + 오버레이 기술 검증',
+  PHASE_BADGE: 'Phase D2 — 통계 + 설정',
   DESCRIPTION:
     '이 창을 닫아도 앱은 종료되지 않고 트레이에 남습니다. 종료는 트레이 메뉴에서만 가능합니다.',
   TEST_OVERLAY_BUTTON: '테스트 알림 띄우기',
   OPEN_SETTINGS_BUTTON: '설정 열기',
   HIDE_BUTTON: '트레이로 숨기기',
+
+  STATS_TODAY: '오늘',
+  STATS_WEEK: '최근 7일',
+  STATS_WORKED: '작업시간',
+  STATS_SESSIONS: '세션',
+  STATS_RATE: '실천율',
+  STATS_EMPTY: '아직 기록이 없어요. 트레이에서 [▶ 작업 시작]을 눌러보세요.',
+  STATS_SESSION_UNIT: '회',
+  STATS_ACTIVE: '세션 진행 중',
 } as const

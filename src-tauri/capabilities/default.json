@@ -1,12 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "메인 / 설정 / 오버레이 창 공통 권한 (Phase D1)",
+  "description": "메인 / 설정 / 오버레이 창 공통 권한 (Phase D2)",
   "windows": ["main", "settings", "overlay"],
   "permissions": [
     "core:default",
     "opener:default",
     "autostart:default",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "core:event:allow-emit",
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-position",

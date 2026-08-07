@@ -1,3 +1,4 @@
+mod db;
 #[cfg(debug_assertions)]
 mod debug_cmd;
 mod overlay;
@@ -27,6 +28,11 @@ pub fn run() {
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),
         ))
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations(db::DB_URL, db::migrations())
+                .build(),
+        )
         .manage(session::SessionState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             overlay::show_overlay_noactivate,
@@ -34,6 +40,8 @@ pub fn run() {
             overlay::log_overlay_action,
             session::current_session,
             session::log_completion,
+            session::log_debug,
+            session::start_session_command,
             windows::hide_main_window,
             windows::open_settings_window,
             windows::trigger_test_overlay,

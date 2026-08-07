@@ -5,16 +5,32 @@ body {
 
 .settings {
   height: 100%;
-  padding: 28px 30px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
+  overflow-y: auto;
 }
 
 .settings h1 {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 19px;
   font-weight: 650;
+}
+
+.settings h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.settings section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .row {
@@ -24,18 +40,82 @@ body {
   cursor: pointer;
 }
 
-.row input {
+.row--split {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.row input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.behaviors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.behavior {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.behavior__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.behavior__name input {
   width: 17px;
   height: 17px;
   accent-color: var(--accent);
   cursor: pointer;
 }
 
+.behavior__interval {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.behavior__interval input[type='number'] {
+  width: 62px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.behavior__interval input[type='number']:disabled {
+  opacity: 0.4;
+}
+
 .hint {
   margin: 0;
   font-size: 13px;
   color: var(--text-dim);
-  max-width: 40ch;
+  max-width: 46ch;
 }
 
 .error {

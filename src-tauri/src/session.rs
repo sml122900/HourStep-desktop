@@ -24,10 +24,13 @@ static CLOCK_OFFSET_MS: AtomicI64 = AtomicI64::new(0);
 /// 진행 중인 세션의 startedAt (epoch ms). 없으면 세션 미시작.
 pub struct SessionState(pub Mutex<Option<i64>>);
 
+/// `startedAt` 이 있으면 시작, 없으면 종료(그때는 `endedAt` 이 채워진다).
 #[derive(Clone, Serialize)]
 struct SessionChanged {
     #[serde(rename = "startedAt")]
     started_at: Option<i64>,
+    #[serde(rename = "endedAt")]
+    ended_at: Option<i64>,
 }
 
 #[derive(Clone, Serialize)]
@@ -77,7 +80,7 @@ pub fn start(app: &AppHandle) {
     }
     println!("[session] 시작 startedAt={now}");
     crate::tray::set_session_active(app, true);
-    emit_changed(app, Some(now));
+    emit_changed(app, Some(now), None);
 }
 
 pub fn end(app: &AppHandle) {
@@ -90,16 +93,25 @@ pub fn end(app: &AppHandle) {
         println!("[session] 진행 중인 세션 없음 — 무시");
         return;
     };
+    let ended = now_ms();
     println!(
-        "[session] 종료 startedAt={started} 작업시간={}분",
-        (now_ms() - started) / 60_000
+        "[session] 종료 startedAt={started} endedAt={ended} 작업시간={}분",
+        (ended - started) / 60_000
     );
     crate::tray::set_session_active(app, false);
-    emit_changed(app, None);
+    emit_changed(app, None, Some(ended));
 }
 
-fn emit_changed(app: &AppHandle, started_at: Option<i64>) {
-    if let Err(e) = app.emit_to(OVERLAY_LABEL, "session://changed", SessionChanged { started_at }) {
+/// 모든 웹뷰로 방송한다 — 오버레이는 스케줄 때문에, 메인 창은 통계 갱신 때문에 필요하다.
+/// (1초 tick 은 오버레이에만 보낸다. 메인 창까지 매초 깨울 이유가 없다)
+fn emit_changed(app: &AppHandle, started_at: Option<i64>, ended_at: Option<i64>) {
+    if let Err(e) = app.emit(
+        "session://changed",
+        SessionChanged {
+            started_at,
+            ended_at,
+        },
+    ) {
         eprintln!("[session] session://changed 전송 실패: {e}");
     }
 }
@@ -113,6 +125,13 @@ pub fn spawn_tick(app: &AppHandle) {
     });
 }
 
+/// 오버레이의 세션 미시작 리마인더에서 [▶ 작업 시작] 을 눌렀을 때.
+/// 트레이 메뉴와 완전히 같은 경로다.
+#[tauri::command]
+pub fn start_session_command(app: AppHandle) {
+    start(&app);
+}
+
 /// 오버레이 웹뷰가 뜬 직후 현재 세션 상태를 물어보는 용도.
 /// (창이 만들어지기 전에 발행된 `session://changed` 를 놓칠 수 있어서 필요하다)
 #[tauri::command]
@@ -124,4 +143,11 @@ pub fn current_session(app: AppHandle) -> Option<i64> {
 #[tauri::command]
 pub fn log_completion(behavior: String, action: String, at: i64) {
     println!("[session] log behavior={behavior} action={action} at={at}");
+}
+
+/// 프론트엔드가 자동 검증용 한 줄을 Rust stdout 으로 흘려보내는 통로.
+/// DB 는 어댑터(`src/data/db.ts`)만 읽으므로, `--debug-cmd db-dump` 의 결과도 이 길로 나온다.
+#[tauri::command]
+pub fn log_debug(line: String) {
+    println!("[debug] {line}");
 }

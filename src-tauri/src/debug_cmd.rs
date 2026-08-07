@@ -123,6 +123,27 @@ fn run_step(app: &AppHandle, step: &str) {
 
         "dump" => dump(app),
 
+        // DB 는 어댑터(src/data/db.ts)만 읽는다. 그래서 Rust 가 직접 못 찍고 웹뷰에 요청한다 —
+        // 결과는 `log_debug` 를 타고 `[debug] db ...` 로 stdout 에 나온다.
+        "db-dump" => {
+            if let Err(e) = app.emit_to(overlay::OVERLAY_LABEL, "overlay://debug-db-dump", ()) {
+                eprintln!("[debug-cmd] db-dump 전송 실패: {e}");
+            }
+        }
+
+        // `set-interval:water=5` — 설정 창의 저장·방송 경로(saveSettingsAndBroadcast)를 그대로 탄다.
+        // "설정 변경이 실행 중 세션 스케줄에 즉시 반영되는가"를 클릭 없이 검증하기 위한 것.
+        "set-interval" => {
+            let Some(spec) = arg else {
+                eprintln!("[debug-cmd] set-interval 은 '<behaviorId>=<분>' 형식이 필요합니다");
+                return;
+            };
+            if let Err(e) = app.emit_to(overlay::OVERLAY_LABEL, "overlay://debug-set-interval", spec)
+            {
+                eprintln!("[debug-cmd] set-interval 전송 실패: {e}");
+            }
+        }
+
         // 트레이 [종료] 와 같은 경로
         "quit" => {
             println!("[debug-cmd] quit — 트레이 [종료] 와 동일 경로");

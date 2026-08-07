@@ -89,6 +89,45 @@ body,
   padding-left: 60px;
 }
 
+/* 세션 종료 요약 */
+.card__note {
+  margin: 14px 0 0;
+  padding-left: 60px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.card__summary {
+  margin: 14px 0 0;
+  padding: 0 0 0 60px;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.card__summary li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  font-size: 14px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.card__summary-rate {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.card__summary-rate em {
+  margin-left: 8px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
 .btn {
   padding: 8px 15px;
   border-radius: 10px;
