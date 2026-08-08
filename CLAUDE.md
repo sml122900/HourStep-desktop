@@ -124,6 +124,7 @@ src/windows/{main,overlay,settings}/        창별 React 앱
   main/MainWindow.tsx                       세션 제어 + 실시간 타이머·예정 목록 + 통계
   settings/SettingsWindow.tsx               행동 CRUD + 테마 + 리마인더 + autostart
   settings/RoutineFinder.tsx                AI 브리지 UI (프롬프트→이동→붙여넣기→미리보기→삽입)
+  settings/IntervalInput.tsx                간격(분) 입력칸 — 입력 중 문자열, blur 에 경계 복구
   overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog·리마인더)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
 src-tauri/src/db.rs                         SQLite 스키마·마이그레이션 (읽기/쓰기는 TS 어댑터)
