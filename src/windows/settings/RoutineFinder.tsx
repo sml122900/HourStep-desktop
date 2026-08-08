@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { buildRoutineSearchUrl } from '../../core/aiQuery'
+import { AI_TARGETS, buildAiUrl, buildRoutinePrompt, type AiTarget } from '../../core/aiQuery'
 import {
   MAX_EMOJI_CODEPOINTS,
   MAX_INTERVAL_MINUTES,
@@ -51,11 +54,18 @@ function noticeFor(result: RoutineParseResult): string {
   }
 }
 
+/** 토스트가 떠 있는 시간 */
+const TOAST_MS = 2000
+
 /**
- * 「AI로 루틴 찾기」 — 질의 조립 → 브라우저 열기 → 붙여넣기 → 미리보기 → 삽입.
+ * 「AI로 루틴 찾기」 — 프롬프트 생성 → AI 로 이동 → 붙여넣기 → 미리보기 → 삽입.
  *
- * 앱은 구글 결과를 직접 읽지 않는다. 브라우저는 기본 브라우저로 열고(앱 내 웹뷰 금지),
+ * 앱은 AI 결과를 직접 읽지 않는다. 브라우저는 기본 브라우저로 열고(앱 내 웹뷰 금지),
  * 돌아오는 경로는 오직 사용자의 복사·붙여넣기다 (docs/decisions/0008).
+ *
+ * **프롬프트를 URL 에 몰래 태우고 끝내지 않는다.** 전문을 화면에 그대로 보여주고,
+ * 어디로 가든 이동 시 클립보드에 넣는다 — 프롬프트를 못 들고 가면 이동이 무의미하기 때문이고,
+ * 구글 말고 다른 AI 를 써도 되게 하려면 URL 주입에 기댈 수 없기 때문이다.
  *
  * **파싱 실패로 끝내지 않는다** — 실패하면 붙여넣은 원문을 그대로 둔 채 빈 줄을 하나 띄워
  * 보고 직접 입력하게 한다. 성공이든 실패든 이후 경로(미리보기 → 확인 → 삽입)는 완전히 같다.
@@ -76,6 +86,50 @@ export default function RoutineFinder({
   const [rows, setRows] = useState<Row[] | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef(0)
+  const sectionRef = useRef<HTMLElement>(null)
+
+  /** 화면에 그대로 보이는 프롬프트이자 클립보드에 들어가는 것. 입력이 바뀌면 즉시 따라온다. */
+  const prompt = useMemo(() => buildRoutinePrompt({ job, symptom }), [job, symptom])
+  const promptRef = useRef(prompt)
+  promptRef.current = prompt
+
+  function flash(message: string) {
+    setToast(message)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS)
+  }
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), [])
+
+  /**
+   * `--debug-cmd settings-open:ai` — 접힌 패널을 펼치고 화면 안으로 굴린다. 이 섹션은
+   * 클릭해야 열리고 목록 아래에 있는데, 사용자 데스크톱에 합성 입력(클릭·스크롤)을 주입하는 건
+   * 금지라(CLAUDE.md 「검증 정책」) 펼친 상태를 캡처하려면 훅이 필요하다.
+   */
+  useEffect(() => {
+    const unlisteners = [
+      listen('settings://debug-open-ai', () => {
+        setOpen(true)
+        // 열리면서 늘어난 높이가 반영된 뒤에 굴려야 실제로 보이는 위치에 선다
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ block: 'start' }))
+        )
+      }),
+      /**
+       * `--debug-cmd ai-copy` — [복사] 버튼과 **같은 경로**로 클립보드에 쓴다.
+       * 권한(capabilities) 배선 실수는 빌드로 안 잡히고 런타임에 조용히 실패하는 종류라
+       * 여기까지는 자동으로 확인한다. 실제로 들어갔는지는 밖에서 `Get-Clipboard` 로 대조.
+       */
+      listen('settings://debug-copy-prompt', () => {
+        void writeText(promptRef.current)
+          .then(() => invoke('log_debug', { line: `ai-copy ok len=${promptRef.current.length}` }))
+          .catch((e) => invoke('log_debug', { line: `ai-copy 실패: ${e}` }))
+      }),
+    ]
+    return () => unlisteners.forEach((p) => void p.then((fn) => fn()))
+  }, [])
 
   function reset() {
     setRows(null)
@@ -84,14 +138,32 @@ export default function RoutineFinder({
     setPasted('')
   }
 
-  async function search() {
+  /** 실패하면 토스트 대신 안내를 남긴다 — 프롬프트 전문이 화면에 있으니 직접 복사할 수 있다 */
+  async function copyPrompt(): Promise<boolean> {
     setError(null)
     try {
-      await openUrl(buildRoutineSearchUrl({ job, symptom }))
-      setNotice(AI.SEARCH_OPENED)
+      await writeText(prompt)
+      flash(AI.COPIED)
+      return true
+    } catch (e) {
+      console.error('[settings] 클립보드 복사 실패', e)
+      setError(AI.COPY_ERROR)
+      return false
+    }
+  }
+
+  /**
+   * 복사 없이 이동하면 무의미하다 — **먼저 복사하고** 연다. 구글은 프롬프트가 URL 에도
+   * 실리지만, 그렇다고 복사를 건너뛰지 않는다(사용자가 다시 붙여넣을 수 있어야 한다).
+   * 복사가 실패해도 이동은 막지 않는다. 프롬프트 전문은 화면에 남아 있다.
+   */
+  async function openTarget(target: AiTarget) {
+    await copyPrompt()
+    try {
+      await openUrl(buildAiUrl(target, prompt))
     } catch (e) {
       console.error('[settings] 브라우저 열기 실패', e)
-      setError(AI.SEARCH_ERROR)
+      setError(AI.OPEN_ERROR)
     }
   }
 
@@ -111,7 +183,7 @@ export default function RoutineFinder({
   const overflow = selected.length > remaining
 
   return (
-    <section>
+    <section ref={sectionRef}>
       <h2>{AI.TITLE}</h2>
 
       {!open ? (
@@ -143,15 +215,38 @@ export default function RoutineFinder({
             </label>
           </div>
 
+          {/* ① 무엇을 보내는지 보고 보낸다. 접거나 숨기지 않는다. */}
+          <div className="ai__field">
+            <span>{AI.PROMPT_LABEL}</span>
+            <pre className="ai__prompt">{prompt}</pre>
+          </div>
+
           <div className="row">
-            <button className="chip" onClick={() => void search()}>
-              {AI.SEARCH}
+            <button className="chip" onClick={() => void copyPrompt()}>
+              {AI.PROMPT_COPY}
             </button>
             <button className="chip" onClick={() => setOpen(false)}>
               {AI.CLOSE}
             </button>
           </div>
 
+          {/* ② 어디로 갈지는 사용자가 고른다. 주소는 core/aiQuery.ts 의 AI_TARGETS 한 곳에만. */}
+          <div className="ai__field">
+            <span>{AI.TARGETS_LABEL}</span>
+            <div className="row row--wrap">
+              {AI_TARGETS.map((target) => (
+                <button key={target.id} className="chip" onClick={() => void openTarget(target)}>
+                  {(target.injectsPrompt ? AI.TARGET_OPEN : AI.TARGET_OPEN_PASTE).replace(
+                    '{name}',
+                    target.name
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="hint">{AI.TARGETS_HINT}</p>
+
+          {/* ③ 결과 붙여넣기 */}
           <label className="ai__field">
             <span>{AI.PASTE_LABEL}</span>
             <textarea
@@ -264,6 +359,9 @@ export default function RoutineFinder({
           {error && <p className="error">{error}</p>}
         </>
       )}
+
+      {/* 복사는 화면에 아무 흔적도 남기지 않는 동작이라 피드백이 없으면 눌렸는지 알 수 없다 */}
+      {toast && <div className="toast">{toast}</div>}
     </section>
   )
 }

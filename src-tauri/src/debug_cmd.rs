@@ -135,7 +135,26 @@ fn run_step(app: &AppHandle, step: &str) {
             }
         }
 
-        "settings-open" => windows::show_settings_window(app),
+        // `settings-open:ai` 는 「AI로 루틴 찾기」 패널까지 펼친다. 그 섹션은 클릭해야 열리는데
+        // 합성 입력이 금지라 펼친 상태를 캡처할 방법이 없다.
+        "settings-open" => {
+            windows::show_settings_window(app);
+            if arg == Some("ai") {
+                if let Err(e) = app.emit_to(windows::SETTINGS_LABEL, "settings://debug-open-ai", ())
+                {
+                    eprintln!("[debug-cmd] settings-open:ai 전송 실패: {e}");
+                }
+            }
+        }
+        // 설정 창의 [📋 복사] 와 같은 경로로 클립보드에 쓴다. 바깥에서 Get-Clipboard 로 대조하면
+        // 플러그인·권한 배선까지 확인된다 (빌드로는 안 잡히는 종류의 실패다).
+        "ai-copy" => {
+            if let Err(e) = app.emit_to(windows::SETTINGS_LABEL, "settings://debug-copy-prompt", ())
+            {
+                eprintln!("[debug-cmd] ai-copy 전송 실패: {e}");
+            }
+        }
+
         "main-show" => windows::show_window(app, windows::MAIN_LABEL),
         "main-hide" => {
             if let Some(w) = app.get_webview_window(windows::MAIN_LABEL) {

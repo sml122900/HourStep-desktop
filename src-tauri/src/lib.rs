@@ -24,6 +24,9 @@ pub fn run() {
             windows::show_window(app, windows::MAIN_LABEL);
         }))
         .plugin(tauri_plugin_opener::init())
+        // D2.6 — AI 로 이동할 때 프롬프트를 클립보드에 넣는다. 웹뷰의 navigator.clipboard 는
+        // 패키징 후 오리진(tauri://)에서 조용히 실패할 수 있어 플러그인 경로로 간다.
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),

@@ -106,16 +106,26 @@ export const AI = {
   TITLE: 'AI로 루틴 찾기',
   OPEN: '🔍 시작하기',
   CLOSE: '닫기',
-  INTRO: '내 상황을 적으면 질문을 만들어 브라우저에서 열어드려요. 답을 복사해 아래에 붙여넣으세요.',
+  INTRO: '내 상황을 적으면 프롬프트를 만들어 드려요. AI에 붙여넣고, 답을 복사해 아래에 넣으세요.',
 
   JOB_LABEL: '직군·자세',
   JOB_PLACEHOLDER: '예: 사무직, 하루 종일 앉아서 코딩',
   SYMPTOM_LABEL: '증상·고민',
   SYMPTOM_PLACEHOLDER: '예: 어깨가 뻐근하고 눈이 침침해요',
 
-  SEARCH: '🌐 브라우저에서 검색',
-  SEARCH_ERROR: '브라우저를 열지 못했습니다.',
-  SEARCH_OPENED: '브라우저를 열었어요. 답변을 복사해 아래에 붙여넣어 주세요.',
+  /** ① 프롬프트 — 숨기지 않는다. 무엇을 보내는지 보고 보내야 한다 */
+  PROMPT_LABEL: '이 프롬프트가 만들어졌어요',
+  PROMPT_COPY: '📋 복사',
+
+  /** ② AI 열기 — 어디로 가든 상관없다. 구글만 프롬프트가 URL 에 실린다 */
+  TARGETS_LABEL: 'AI 열기',
+  TARGET_OPEN: '{name} 열기',
+  TARGET_OPEN_PASTE: '{name} 열기 (붙여넣기 필요)',
+  TARGETS_HINT: '어느 AI를 써도 괜찮아요. 열면 프롬프트가 자동으로 복사됩니다.',
+  OPEN_ERROR: '브라우저를 열지 못했습니다.',
+
+  COPIED: '프롬프트 복사됨',
+  COPY_ERROR: '복사하지 못했습니다. 프롬프트를 직접 선택해 복사해 주세요.',
 
   PASTE_LABEL: '붙여넣기',
   PASTE_PLACEHOLDER: 'AI 답변을 통째로 붙여넣으세요. [HOURSTEP] 블록만 읽습니다.',

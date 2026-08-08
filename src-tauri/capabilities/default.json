@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "메인 / 설정 / 오버레이 창 공통 권한 (Phase D2.5)",
+  "description": "메인 / 설정 / 오버레이 창 공통 권한 (Phase D2.6)",
   "windows": ["main", "settings", "overlay"],
   "permissions": [
     "core:default",
     "opener:default",
+    "clipboard-manager:allow-write-text",
     "autostart:default",
     "sql:default",
     "sql:allow-load",
