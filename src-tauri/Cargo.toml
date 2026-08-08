@@ -1,6 +1,6 @@
 [package]
 name = "hourstep-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "HourStep Desktop — 세션 기반 웰니스 브레이크 앱"
 authors = ["HourStep"]
 edition = "2021"

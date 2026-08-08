@@ -5,6 +5,8 @@
 > 배경·규칙은 `CLAUDE.md`, 상세 기록은 `docs/daily/`·`docs/decisions/`.
 
 **마지막 갱신: 2026-08-08** · **현재 Phase: D2.6 완료(자동 검증까지) → 다음 D3**
+**설치본: 0.2.0** (`%LOCALAPPDATA%\HourStep`, NSIS per-user). 도그푸딩 기기에 설치 완료 —
+개발 DB 와 설치본이 **같은 `%APPDATA%\com.hourstep.desktop\hourstep.db`** 를 쓴다는 점에 주의.
 
 ---
 
