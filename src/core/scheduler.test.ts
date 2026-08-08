@@ -22,6 +22,7 @@ function behavior(over: Partial<Behavior> = {}): Behavior {
     intensity: 'card',
     enabled: true,
     isBuiltin: true,
+    source: 'user',
     sortOrder: 0,
     ...over,
   }

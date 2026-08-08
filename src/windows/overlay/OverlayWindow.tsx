@@ -15,6 +15,7 @@ import {
 } from '../../core/behaviors'
 import { computeOverlayWindowPosition } from '../../core/overlayPosition'
 import { seedBehaviors } from '../../core/presets'
+import { parseRoutineBlock, routineItemsToBehaviors } from '../../core/routineParse'
 import { SNOOZE_MS, computeNextOccurrences, occurrenceId } from '../../core/scheduler'
 import { DEFAULT_SETTINGS, type AppSettings } from '../../core/settings'
 import { computeSessionSummary, type Stats } from '../../core/stats'
@@ -56,7 +57,7 @@ type Active =
  * `--debug-cmd` 의 행동 CRUD. 설정 창과 **같은 함수**(`saveBehaviorsAndBroadcast`)를 타야
  * "클릭 없이 검증한 결과"가 실제 사용자 경로를 대변한다 (CLAUDE.md 「검증 정책」).
  *
- * spec: `add:<id>=<분>` / `delete:<id>` / `restore` / `interval:<id>=<분>`
+ * spec: `add:<id>=<분>` / `delete:<id>` / `restore` / `interval:<id>=<분>` / `ai-import:<분>`
  */
 async function debugBehavior(spec: string): Promise<void> {
   const separator = spec.indexOf(':')
@@ -89,6 +90,28 @@ async function debugBehavior(spec: string): Promise<void> {
       case 'restore':
         next = restoreBuiltins(current)
         break
+      /**
+       * D2.6 — 「AI로 루틴 찾기」의 **붙여넣기부터**를 클릭 없이 태운다.
+       * 검색·브라우저 열기는 자동 검증 대상이 아니고(눈으로 본다), 여기서 검증할 것은
+       * "붙여넣은 텍스트 → 파싱 → 삽입 → 실행 중 세션에서 발화" 사슬이다.
+       * 설정 창 미리보기가 통과시키는 것과 **같은 함수**(parse → routineItemsToBehaviors)를 탄다.
+       */
+      case 'ai-import': {
+        const minutes = Number(arg) > 0 ? Number(arg) : 3
+        const pasted =
+          '말씀하신 상황이라면 이렇게 해보세요.\n\n' +
+          '```\n[HOURSTEP]\n' +
+          `🦾|어깨 돌리기|${minutes}분|어깨를 천천히 뒤로 돌려주세요\n` +
+          '[/HOURSTEP]\n```'
+        const parsed = parseRoutineBlock(pasted)
+        if (!parsed.ok) {
+          await invoke('log_debug', { line: `ai-import 파싱 실패: ${parsed.reason}` })
+          return
+        }
+        next = routineItemsToBehaviors(current, parsed.items, Date.now())
+        break
+      }
+
       case 'interval':
         next = current.map((b) =>
           b.id === id ? { ...b, rule: { kind: 'interval' as const, everyMs: Number(rawMinutes) * 60_000 } } : b
@@ -101,13 +124,17 @@ async function debugBehavior(spec: string): Promise<void> {
 
     const saved = await db.saveBehaviorsAndBroadcast(next)
     const applied = saved.find((b) => b.id === id)
+
     // D2 e2e 스크립트가 이 형식을 파싱한다 — set-interval 의 출력은 바꾸지 않는다
-    await invoke('log_debug', {
-      line:
-        op === 'interval'
-          ? `settings ${id}.everyMinutes=${applied ? intervalMinutes(applied) : 'none'}`
-          : `behavior ${op} ${id ?? ''} n=${saved.length}`,
-    })
+    let line = `behavior ${op} ${id ?? ''} n=${saved.length}`
+    if (op === 'interval') {
+      line = `settings ${id}.everyMinutes=${applied ? intervalMinutes(applied) : 'none'}`
+    } else if (op === 'ai-import') {
+      // 삽입된 행동의 id 를 찍는다 — 이어지는 tick 이 무엇을 띄워야 하는지 대조할 수 있게
+      const ai = saved.filter((b) => b.source === 'ai')
+      line = `behavior ai-import n=${saved.length} ai=${ai.map((b) => `${b.id}:${intervalMinutes(b)}m`).join(' ')}`
+    }
+    await invoke('log_debug', { line })
   } catch (e) {
     await invoke('log_debug', { line: `behavior ${spec} 실패: ${e}` })
   }

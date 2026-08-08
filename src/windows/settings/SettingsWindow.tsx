@@ -18,10 +18,12 @@ import {
   MIN_IDLE_REMINDER_MINUTES,
   type AppSettings,
 } from '../../core/settings'
+import { routineItemsToBehaviors, type RoutineItem } from '../../core/routineParse'
 import { THEME_PREFERENCES, type ThemePreference } from '../../core/theme'
 import type { Behavior } from '../../core/types'
 import * as db from '../../data/db'
-import { SETTINGS } from '../../constants/strings'
+import { AI, SETTINGS } from '../../constants/strings'
+import RoutineFinder from './RoutineFinder'
 
 const MIN = 60_000
 
@@ -117,6 +119,21 @@ export default function SettingsWindow() {
   }, [persistBehaviors])
 
   /**
+   * 「AI로 루틴 찾기」에서 확인한 항목을 실제 행동으로 넣는다. 직삽입 경로가 아니다 —
+   * 사용자가 미리보기에서 확인을 눌러야 여기까지 온다. 저장은 손으로 추가할 때와 **같은 함수**를
+   * 타므로 실행 중 세션에도 즉시 반영된다 (D2.5 CRUD 경로 그대로).
+   */
+  const insertRoutine = useCallback(
+    (items: RoutineItem[]) => {
+      const current = draftRef.current
+      if (!current) return
+      // Date.now() 는 UI 계층에서만 — 코어는 now 를 인자로 받는다 (CLAUDE.md 규칙 4)
+      void persistBehaviors(routineItemsToBehaviors(current, items, Date.now()))
+    },
+    [persistBehaviors]
+  )
+
+  /**
    * 이 창은 만들어질 때(앱 기동 시) 한 번 읽고 숨어 있다가 나중에 보인다. 그 사이 값이
    * 바뀌었을 수 있으므로 — 다른 창의 「기본값 복원」, `--debug-cmd`, 앱 최초 시드 —
    * **다시 보일 때** 읽어온다.
@@ -200,6 +217,10 @@ export default function SettingsWindow() {
 
                   {behavior.isBuiltin && (
                     <span className="tag">{SETTINGS.BEHAVIOR_BUILTIN_TAG}</span>
+                  )}
+                  {/* 우리가 지어낸 문구가 아니라 사용자가 AI 답변에서 가져온 것이라는 표시 */}
+                  {behavior.source === 'ai' && (
+                    <span className="tag tag--ai">{AI.SOURCE_TAG}</span>
                   )}
 
                   <span className="behavior__interval">
@@ -289,6 +310,11 @@ export default function SettingsWindow() {
         </p>
         <p className="hint">{SETTINGS.BEHAVIOR_RESTORE_HINT}</p>
       </section>
+
+      <RoutineFinder
+        remaining={Math.max(0, MAX_BEHAVIORS - (behaviors?.length ?? MAX_BEHAVIORS))}
+        onInsert={insertRoutine}
+      />
 
       <section>
         <h2>{SETTINGS.THEME_TITLE}</h2>

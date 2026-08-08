@@ -125,6 +125,13 @@ input[type='checkbox'] {
   font-size: 11px;
 }
 
+/* AI 유래 행동 표시. 「기본」 태그와 나란히 서므로 색만 다르게 준다 */
+.tag--ai {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
 .behavior__interval {
   display: flex;
   align-items: center;
@@ -176,6 +183,42 @@ input[type='checkbox'] {
   color: var(--danger);
 }
 
+/* ─── AI로 루틴 찾기 ─── */
+
+.ai__inputs {
+  display: grid;
+  gap: 8px;
+}
+
+.ai__field {
+  display: grid;
+  gap: 4px;
+}
+
+.ai__field > span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.ai__field input,
+.ai__paste {
+  width: 100%;
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ai__paste {
+  resize: vertical;
+  line-height: 1.45;
+  /* 붙여넣은 원문은 그대로 남는다 — 파싱이 실패해도 보고 직접 입력할 수 있어야 한다 */
+  min-height: 90px;
+}
+
 /* ─── 버튼 ─── */
 
 .chip {
@@ -195,6 +238,18 @@ input[type='checkbox'] {
 .chip:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* 미리보기의 [추가] — 되돌릴 수 없는 삽입이라 다른 버튼과 구분해 둔다 */
+.chip--primary {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: var(--accent-on);
+  font-weight: 600;
+}
+
+.chip--primary:hover:not(:disabled) {
+  background: var(--accent-grad-hover);
 }
 
 .segmented {

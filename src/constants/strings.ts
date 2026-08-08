@@ -93,9 +93,54 @@ export const SETTINGS = {
   SAVE_ERROR: '설정을 저장하지 못했습니다.',
 } as const
 
+/**
+ * D2.6 「AI로 루틴 찾기」.
+ *
+ * 앱은 구글 결과를 직접 읽지 않는다 — 브라우저를 열어주고, 사용자가 복사해 온 텍스트만 받는다
+ * (docs/decisions/0008). 그래서 문구가 단계를 설명하는 형태다.
+ *
+ * CLAUDE.md 규칙 6: 여기 어떤 문구도 건강 효용을 단정하지 않는다. `DISCLAIMER` 는 미리보기에
+ * 항상 고정으로 뜬다 — 우리가 지어낸 문구가 아니라 AI 가 준 문구라는 사실을 화면에 남긴다.
+ */
+export const AI = {
+  TITLE: 'AI로 루틴 찾기',
+  OPEN: '🔍 시작하기',
+  CLOSE: '닫기',
+  INTRO: '내 상황을 적으면 질문을 만들어 브라우저에서 열어드려요. 답을 복사해 아래에 붙여넣으세요.',
+
+  JOB_LABEL: '직군·자세',
+  JOB_PLACEHOLDER: '예: 사무직, 하루 종일 앉아서 코딩',
+  SYMPTOM_LABEL: '증상·고민',
+  SYMPTOM_PLACEHOLDER: '예: 어깨가 뻐근하고 눈이 침침해요',
+
+  SEARCH: '🌐 브라우저에서 검색',
+  SEARCH_ERROR: '브라우저를 열지 못했습니다.',
+  SEARCH_OPENED: '브라우저를 열었어요. 답변을 복사해 아래에 붙여넣어 주세요.',
+
+  PASTE_LABEL: '붙여넣기',
+  PASTE_PLACEHOLDER: 'AI 답변을 통째로 붙여넣으세요. [HOURSTEP] 블록만 읽습니다.',
+  ANALYZE: '분석하기',
+  MANUAL: '직접 입력',
+
+  /** 파싱 결과 안내 — routineParse.ts 의 reason 코드에 대응한다 */
+  RESULT_OK: '{n}개를 찾았어요. 확인하고 추가하세요.',
+  RESULT_PARTIAL: '{n}개를 찾았어요. 형식이 맞지 않는 {skipped}줄은 건너뛰었어요.',
+  RESULT_NO_BLOCK: '[HOURSTEP] 블록을 찾지 못했어요. 형식이 안 맞으면 아래에 직접 입력하세요.',
+  RESULT_EMPTY_BLOCK: '블록은 찾았지만 읽을 수 있는 줄이 없었어요. 아래에 직접 입력하세요.',
+
+  PREVIEW_TITLE: '추가할 행동',
+  DISCLAIMER: '참고용이며 전문의 상담을 대체하지 않습니다.',
+  INSERT: '선택한 {n}개 추가',
+  INSERT_NONE: '추가할 항목을 선택하세요',
+  CANCEL: '취소',
+  ROW_ADD: '＋ 줄 추가',
+  LIMIT: '{n}개까지만 더 추가할 수 있어요. 선택을 줄이거나 기존 행동을 지워주세요.',
+  SOURCE_TAG: 'AI',
+} as const
+
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D2.5 — 메인 화면 + 커스텀 행동',
+  PHASE_BADGE: 'Phase D2.6 — AI 검색 브리지',
   DESCRIPTION:
     '이 창을 닫아도 앱은 종료되지 않고 트레이에 남습니다. 종료는 트레이 메뉴에서만 가능합니다.',
   TEST_OVERLAY_BUTTON: '테스트 알림 띄우기',

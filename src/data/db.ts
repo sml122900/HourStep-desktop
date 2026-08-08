@@ -57,6 +57,7 @@ interface BehaviorRow {
   countdown_ms: number | null
   enabled: number
   is_builtin: number
+  source: string
   sort_order: number
 }
 
@@ -85,6 +86,8 @@ const toBehavior = (r: BehaviorRow): Behavior => ({
   enabled: r.enabled !== 0,
   ...(r.countdown_ms ? { countdownMs: r.countdown_ms } : {}),
   isBuiltin: r.is_builtin !== 0,
+  // 범위 밖 값 정리는 normalizeBehaviors 가 한다 (v3 이전 행은 DEFAULT 로 'user')
+  source: r.source === 'ai' ? 'ai' : 'user',
   sortOrder: r.sort_order,
 })
 
@@ -198,8 +201,8 @@ function upsertBehavior(behavior: Behavior, verb: 'INSERT OR IGNORE' | 'INSERT O
   return db().then((conn) =>
     conn.execute(
       `${verb} INTO behaviors
-         (id, label, emoji, message, every_ms, countdown_ms, enabled, is_builtin, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         (id, label, emoji, message, every_ms, countdown_ms, enabled, is_builtin, source, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         behavior.id,
         behavior.label,
@@ -209,6 +212,7 @@ function upsertBehavior(behavior: Behavior, verb: 'INSERT OR IGNORE' | 'INSERT O
         behavior.countdownMs ?? null,
         behavior.enabled ? 1 : 0,
         behavior.isBuiltin ? 1 : 0,
+        behavior.source,
         behavior.sortOrder,
       ]
     )
@@ -220,7 +224,7 @@ export async function loadBehaviors(): Promise<Behavior[]> {
   await seedBehaviorsIfEmpty()
   const conn = await db()
   const rows = await conn.select<BehaviorRow[]>(
-    `SELECT id, label, emoji, message, every_ms, countdown_ms, enabled, is_builtin, sort_order
+    `SELECT id, label, emoji, message, every_ms, countdown_ms, enabled, is_builtin, source, sort_order
        FROM behaviors ORDER BY sort_order, id`
   )
   return normalizeBehaviors(rows.map(toBehavior))
@@ -312,13 +316,15 @@ export async function summarize(): Promise<string> {
        FROM completion_logs`
   )
   // 별칭에 `on` 을 쓰지 않는다 — SQLite 예약어(JOIN ... ON)라 파싱이 깨진다
-  const [behaviors] = await conn.select<{ n: number; enabled_n: number }[]>(
-    `SELECT COUNT(*) AS n, SUM(enabled) AS enabled_n FROM behaviors`
+  const [behaviors] = await conn.select<{ n: number; enabled_n: number; ai_n: number }[]>(
+    `SELECT COUNT(*) AS n, SUM(enabled) AS enabled_n,
+            SUM(CASE WHEN source = 'ai' THEN 1 ELSE 0 END) AS ai_n
+       FROM behaviors`
   )
   return (
     `db sessions=${sessions.n} open=${sessions.open ?? 0} workedMs=${sessions.worked} ` +
     `logs=${logs.n} done=${logs.done ?? 0} labeled=${logs.labeled ?? 0} ` +
-    `behaviors=${behaviors.n} enabled=${behaviors.enabled_n ?? 0}`
+    `behaviors=${behaviors.n} enabled=${behaviors.enabled_n ?? 0} ai=${behaviors.ai_n ?? 0}`
   )
 }
 
@@ -328,7 +334,8 @@ export async function summarizeBehaviors(): Promise<string> {
   const parts = behaviors.map(
     (b) =>
       `${b.sortOrder}:${b.id}(${b.emoji}${b.label},${intervalMinutes(b)}m,` +
-      `${b.enabled ? 'on' : 'off'}${b.isBuiltin ? ',builtin' : ''})`
+      `${b.enabled ? 'on' : 'off'}${b.isBuiltin ? ',builtin' : ''}` +
+      `${b.source === 'ai' ? ',ai' : ''})`
   )
   return `behaviors n=${behaviors.length} ${parts.join(' ')}`
 }

@@ -27,6 +27,7 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     // CLAUDE.md 프리셋: "완료 시 1분 카운트다운 제안"
     countdownMs: 1 * MIN,
     isBuiltin: true,
+    source: 'user',
     sortOrder: 0,
   },
   {
@@ -38,6 +39,7 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     intensity: 'card',
     enabled: true,
     isBuiltin: true,
+    source: 'user',
     sortOrder: 1,
   },
   {
@@ -49,6 +51,7 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     intensity: 'card',
     enabled: true,
     isBuiltin: true,
+    source: 'user',
     sortOrder: 2,
   },
 ]

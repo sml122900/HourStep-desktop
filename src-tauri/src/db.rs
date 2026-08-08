@@ -73,5 +73,18 @@ pub fn migrations() -> Vec<Migration> {
             CREATE INDEX IF NOT EXISTS idx_behaviors_order ON behaviors(sort_order);
         ",
     },
+    // D2.6 — 「AI로 루틴 찾기」로 들어온 행동의 출처 표시.
+    //
+    // `is_builtin` 을 겸용하지 않는다: 그건 "내장 3종이냐"는 다른 사실이고, 향후 근거 기반
+    // 프로토콜을 붙일 자리다. 하나의 열에 두 의미를 태우면 둘 중 하나는 반드시 어긋난다.
+    // 기존 행은 DEFAULT 로 'user' 가 되고, 값 검증은 어댑터의 normalizeBehaviors 가 한다.
+    Migration {
+        version: 3,
+        description: "behavior_source",
+        kind: MigrationKind::Up,
+        sql: "
+            ALTER TABLE behaviors ADD COLUMN source TEXT NOT NULL DEFAULT 'user';
+        ",
+    },
     ]
 }

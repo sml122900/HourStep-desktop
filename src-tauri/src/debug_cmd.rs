@@ -18,6 +18,9 @@
 //!
 //! # D2.5 행동 CRUD 가 실행 중 세션 스케줄에 즉시 반영되는가
 //! pnpm tauri dev -- -- -- --debug-cmd "wait:4000,start-session,behavior-add:jump=7,wait:1500,behaviors-dump,tick:420000,wait:2500,dump,done,wait:1500,behavior-delete:jump,wait:1500,behaviors-dump,quit"
+//!
+//! # D2.6 AI 루틴 삽입 → 발화까지 (붙여넣기 파싱 → 저장 → 실행 중 세션 반영)
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:5000,start-session,wait:1000,ai-import:3,wait:2000,behaviors-dump,tick:180000,wait:2500,dump,done,wait:1500,db-dump,quit"
 //! ```
 //!
 //! 한계: 이 훅은 **자기 프로세스 안에서만** 동작한다. 이미 떠 있는 다른 인스턴스에는 명령을
@@ -169,6 +172,15 @@ fn run_step(app: &AppHandle, step: &str) {
             None => eprintln!("[debug-cmd] behavior-delete 는 '<id>' 가 필요합니다"),
         },
         "behavior-restore" => ask_overlay(app, "overlay://debug-behavior", "restore".to_string()),
+
+        // D2.6 — 「AI로 루틴 찾기」의 붙여넣기 이후 경로. 고정 샘플 답변을 파싱해서 삽입한다.
+        // 검색·브라우저 열기는 여기에 없다 (자동 검증 대상이 아니다 — 눈으로 본다).
+        //   ai-import[:<분>]   기본 3분
+        "ai-import" => ask_overlay(
+            app,
+            "overlay://debug-behavior",
+            format!("ai-import:{}", arg.unwrap_or("3")),
+        ),
 
         // `set-theme:light|dark|system` — 설정 창의 테마 저장 경로를 그대로 탄다.
         "set-theme" => match arg {

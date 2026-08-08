@@ -9,7 +9,7 @@
  */
 
 import { seedBehaviors } from './presets'
-import type { Behavior } from './types'
+import type { Behavior, BehaviorSource } from './types'
 
 const MIN = 60_000
 
@@ -96,6 +96,8 @@ export function normalizeBehavior(raw: Partial<Behavior>, fallback?: Behavior): 
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
     ...(countdown > 0 ? { countdownMs: countdown } : {}),
     isBuiltin: raw.isBuiltin === true,
+    // 모르는 값은 'user'. AI 유래 표시는 붙일 때만 붙고, 아니면 붙지 않는 쪽이 안전하다
+    source: (raw.source === 'ai' ? 'ai' : 'user') satisfies BehaviorSource,
     sortOrder: Number.isFinite(raw.sortOrder) ? Number(raw.sortOrder) : 0,
   }
 }

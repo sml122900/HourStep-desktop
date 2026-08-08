@@ -19,6 +19,15 @@ export type BehaviorRule =
   /** 세션 경과 특정 시점 1회 */
   | { kind: 'atElapsed'; atMs: number }
 
+/**
+ * 이 행동의 문구가 어디서 왔는가.
+ *
+ * `'ai'` 는 D2.6 「AI로 루틴 찾기」로 가져온 것 — 우리가 지어낸 문구가 아니라 사용자가
+ * 붙여넣고 확인한 문구라는 표시다. 내장 3종 여부는 `isBuiltin` 이 따로 들고 있으므로
+ * 여기에 `'builtin'` 을 두지 않는다 (같은 사실을 두 곳에 적으면 어긋난다).
+ */
+export type BehaviorSource = 'user' | 'ai'
+
 export interface Behavior {
   id: string
   label: string
@@ -36,6 +45,8 @@ export interface Behavior {
    * 사용자가 편집·삭제할 수 있고 그래도 플래그는 유지된다.
    */
   isBuiltin: boolean
+  /** 문구의 출처. 설정 목록에서 AI 유래 행동을 구분해 보여준다 */
+  source: BehaviorSource
   /** 목록 표시 순서. 오름차순, 0부터 연속 */
   sortOrder: number
 }

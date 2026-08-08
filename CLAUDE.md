@@ -19,7 +19,9 @@
 2. **세션 모델**: 알림은 활성 WorkSession 중에만 발생. 고정 근무시간 개념 없음
 3. 오버레이 기본 강도는 **중앙 상단 카드** (프레임리스, always-on-top). 풀스크린 딤은 행동별 opt-in (P2)
 4. **스케줄러는 IO 없는 순수 함수 + vitest**. 모바일(Expo)과 공유 전제 — now를 인자로 주입, 플랫폼 API 참조 금지, Date.now() 직접 호출 금지
-5. MVP는 **로컬 전용** (tauri-plugin-sql / SQLite). 계정·Supabase·AI·광고 코드 작성 금지 (이후 Phase)
+5. MVP는 **로컬 전용** (tauri-plugin-sql / SQLite). 계정·Supabase·AI API·광고 코드 작성 금지 (이후 Phase).
+   D2.6 의 「AI로 루틴 찾기」는 이 금지에 걸리지 않는다 — **API 키도 HTTP 요청도 없고**,
+   기본 브라우저를 열어주고 사용자가 복사해 온 텍스트만 파싱한다 (`docs/decisions/0008`)
 6. 건강 효용 문구는 연구 인용형("~라는 연구가 있어요")만. 치료·개선 단정 표현 금지
 7. git commit·push는 Claude가 직접 수행해도 된다 (2026-08-05 변경). 단 태그·릴리스 배포는 사용자 판단
 8. UI 문구는 한국어, 상수 파일(src/constants/strings.ts)로 분리. 사용자가 직접 쓴 카피는 임의 수정 금지 — 우려가 있으면 지적만 하고 원문 유지
@@ -38,8 +40,10 @@ Behavior {
   enabled: boolean,
   countdownMs?: number,                                       // 완료 후 제안할 카운트다운
   isBuiltin: boolean,                                         // 기본 3종 표시 (근거 프로토콜 자리)
+  source: 'user' | 'ai',                                      // 문구 출처. 'ai' 는 D2.6 브리지로 가져온 것
   sortOrder: number                                           // 목록 순서, 0부터 연속
 }
+RoutineItem { emoji, label, minutes, message }                 // 파서 출력 — 아직 행동이 아니다
 Occurrence { behaviorId, dueAt, origin: 'regular' | 'snooze' }  // 스케줄러 출력
 CompletionLog {
   occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at,
@@ -70,6 +74,8 @@ DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·�
   + 세션 미시작 리마인더
 - **D2.5 (완료)**: 메인 창 세션 제어·실시간 타이머 + 행동 CRUD(마이그레이션 v2)
   + 라이트/다크/시스템 테마
+- **D2.6 (완료)**: AI 검색 브리지 — 구글 딥링크 + 붙여넣기 파서(마이그레이션 v3).
+  **앱이 구글 결과를 직접 읽지 않는다** (`docs/decisions/0008`)
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
 
@@ -107,6 +113,7 @@ src/constants/strings.ts                    UI 문구 (한국어) + 내장 행�
 src/core/                                   IO 없는 순수 모듈 — React·Tauri import 금지 (eslint로 강제)
   types.ts / scheduler.ts / stats.ts / overlayPosition.ts
   behaviors.ts                              행동 정규화·순서·기본값 복원·레거시 흡수
+  aiQuery.ts / routineParse.ts              AI 브리지 — 질의·딥링크 조립 / 붙여넣기 파서
   presets.ts                                시드 전용 (런타임 소스 아님)
   settings.ts                               행동 아닌 앱 설정 (리마인더·테마)
   theme.ts                                  선호 + OS 상태 → 실제 테마          (+ 각 *.test.ts)
@@ -116,6 +123,7 @@ src/windows/theme.ts                        data-theme 적용 + 설정·OS 변�
 src/windows/{main,overlay,settings}/        창별 React 앱
   main/MainWindow.tsx                       세션 제어 + 실시간 타이머·예정 목록 + 통계
   settings/SettingsWindow.tsx               행동 CRUD + 테마 + 리마인더 + autostart
+  settings/RoutineFinder.tsx                AI 브리지 UI (검색→붙여넣기→미리보기→삽입)
   overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog·리마인더)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
 src-tauri/src/db.rs                         SQLite 스키마·마이그레이션 (읽기/쓰기는 TS 어댑터)
@@ -140,7 +148,7 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
 ### 저장소
 `%APPDATA%\com.hourstep.desktop\hourstep.db` (SQLite, WAL). 스키마·마이그레이션은
 `src-tauri/src/db.rs` 가 소유하고, **읽기/쓰기는 `src/data/db.ts` 어댑터만** 한다.
-현재 마이그레이션 v2 (`work_sessions` / `completion_logs` / `settings` / `behaviors`).
+현재 마이그레이션 v3 (`work_sessions` / `completion_logs` / `settings` / `behaviors`).
 행동 아닌 설정은 `settings` 테이블에 JSON 한 덩어리 (근거: `docs/decisions/0003`),
 행동은 `behaviors` 테이블 (근거: `docs/decisions/0007`).
 - 저장된 값을 그대로 믿지 않는다 — `normalizeSettings()` / `normalizeBehaviors()` 로
@@ -149,6 +157,8 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   단일 출처를 `src/core/presets.ts` 한 곳에 두기 위해서 — 「기본값 복원」도 같은 함수를 탄다
 - 행동 삭제 후에도 통계가 살아남도록 `completion_logs.behavior_label` 에 기록 시점 이름을
   스냅샷한다. FK `ON DELETE SET NULL` 을 쓰지 않는 이유는 `docs/decisions/0006`
+- `behaviors.source` (v3) 는 문구 출처(`'user'|'ai'`)다. `is_builtin` 을 겸용하지 않는 이유는
+  `docs/decisions/0008` — 한 열에 두 의미를 태우면 둘 중 하나는 어긋난다
 - 앱이 강제 종료되면 `ended_at IS NULL` 세션이 남는다. 기동 시 `closeDanglingSessions(bootedAt)`
   가 **마지막 기록 시각**으로 닫는다. `bootedAt` 인자는 필수 — 없으면 기동 직후 시작한
   살아 있는 세션까지 닫아버린다
@@ -166,9 +176,11 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   (= `overlay-action:<action>`) / `settings-open` / `main-show` / `main-hide` /
   `db-dump` / `behaviors-dump` / `main-dump` / `set-interval:<behaviorId>=<분>` /
   `behavior-add:<id>=<분>` / `behavior-delete:<id>` / `behavior-restore` /
+  `ai-import[:<분>]` (고정 샘플 답변을 파싱→삽입, D2.6) /
   `set-theme:<light|dark|system>` / `dump` / `quit`,
   맨 끝에 `loop` 를 붙이면 무한 반복
-- DB 를 만지는 명령(`db-dump` / `behaviors-dump` / `set-interval` / `behavior-*` / `set-theme`)은
+- DB 를 만지는 명령(`db-dump` / `behaviors-dump` / `set-interval` / `behavior-*` / `ai-import` /
+  `set-theme`)은
   **DB 를 어댑터만 읽는다**는 규칙 때문에 Rust 가 직접 처리하지 않고 오버레이 웹뷰에 요청한다.
   결과는 `log_debug` 를 타고 `[debug] …` 로 stdout 에 나온다. 전부 설정 창과 **같은 함수**
   (`saveSettingsAndBroadcast` / `saveBehaviorsAndBroadcast`)를 탄다
