@@ -1,15 +1,101 @@
-:root {
+/*
+ * 색은 전부 여기 토큰으로만 정의한다. 창별 CSS 는 토큰만 참조한다 —
+ * 그래야 라이트/다크 전환이 세 창(+오버레이 카드)에 한꺼번에 먹는다.
+ *
+ * 다크가 `:root` 기본값인 이유: 창이 만들어진 직후 JS 가 `data-theme` 을 붙이기 전까지의
+ * 한 프레임을 다크로 덮어둔다. 앱은 창을 숨긴 채로 만들었다가 나중에 띄우므로 실제로는
+ * 보이지 않지만, 기본값 없이 두면 그 틈에 흰 화면이 번쩍일 수 있다.
+ * 적용은 src/windows/theme.ts, 선택 규칙은 src/core/theme.ts.
+ */
+:root,
+:root[data-theme='dark'] {
   --bg: #12141a;
   --surface: #1b1e26;
+  --surface-hover: #232733;
   --border: #2b2f3a;
+  --hairline: rgba(255, 255, 255, 0.06);
+  --row-bg: rgba(255, 255, 255, 0.04);
+
   --text: #e8eaf0;
   --text-dim: #9aa1b1;
-  --accent: #4f8cff;
+  --text-faint: #6f768a;
 
+  --accent: #4f8cff;
+  --accent-soft: rgba(79, 140, 255, 0.14);
+  --accent-line: rgba(79, 140, 255, 0.3);
+  --accent-text: #9dbcff;
+  --accent-on: #fff;
+  --accent-grad: linear-gradient(180deg, #5b93ff, #3f79ee);
+  --accent-grad-hover: linear-gradient(180deg, #6b9fff, #4a83f5);
+
+  --danger: #ff8080;
+
+  --input-bg: rgba(0, 0, 0, 0.25);
+  --input-border: rgba(255, 255, 255, 0.14);
+
+  --btn-bg: rgba(255, 255, 255, 0.06);
+  --btn-border: rgba(255, 255, 255, 0.11);
+  --btn-hover: rgba(255, 255, 255, 0.12);
+  --btn-ghost-hover: rgba(255, 255, 255, 0.07);
+
+  /* 오버레이 카드 — 임의의 배경 위에 뜨므로 자체 대비를 스스로 확보해야 한다 */
+  --card-bg: linear-gradient(180deg, rgba(30, 34, 44, 0.96), rgba(20, 23, 30, 0.96));
+  --card-border: rgba(255, 255, 255, 0.16);
+  --card-inset-top: rgba(255, 255, 255, 0.09);
+  --card-inset-bottom: rgba(0, 0, 0, 0.4);
+  --card-row-bg: rgba(255, 255, 255, 0.05);
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f2f4f8;
+  --surface: #ffffff;
+  --surface-hover: #eef1f7;
+  --border: #dde1ea;
+  --hairline: rgba(15, 23, 42, 0.08);
+  --row-bg: rgba(15, 23, 42, 0.04);
+
+  --text: #1a1d25;
+  --text-dim: #5b6376;
+  --text-faint: #838b9d;
+
+  --accent: #2f6fe0;
+  --accent-soft: rgba(47, 111, 224, 0.1);
+  --accent-line: rgba(47, 111, 224, 0.28);
+  --accent-text: #2258bd;
+  --accent-on: #fff;
+  --accent-grad: linear-gradient(180deg, #4a84ea, #2f6fe0);
+  --accent-grad-hover: linear-gradient(180deg, #5a90ee, #3a78e6);
+
+  --danger: #c02626;
+
+  --input-bg: #ffffff;
+  --input-border: #cbd2e0;
+
+  --btn-bg: rgba(15, 23, 42, 0.05);
+  --btn-border: rgba(15, 23, 42, 0.14);
+  --btn-hover: rgba(15, 23, 42, 0.1);
+  --btn-ghost-hover: rgba(15, 23, 42, 0.06);
+
+  /*
+   * 라이트에서 카드가 밝은 배경(문서·에디터) 위에 뜨면 묻힌다. 창이 카드 실크기라
+   * 드롭섀도를 쓸 수 없으므로(docs/decisions/0005) 테두리를 다크보다 진하게 잡고
+   * 안쪽 그림자로 가장자리를 눌러 경계를 만든다.
+   */
+  --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(244, 246, 251, 0.985));
+  --card-border: rgba(15, 23, 42, 0.26);
+  --card-inset-top: rgba(255, 255, 255, 0.9);
+  --card-inset-bottom: rgba(15, 23, 42, 0.1);
+  --card-row-bg: rgba(15, 23, 42, 0.05);
+
+  color-scheme: light;
+}
+
+:root {
   font-family: 'Pretendard', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.6;
-  color-scheme: dark;
 }
 
 * {

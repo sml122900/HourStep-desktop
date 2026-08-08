@@ -1,8 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import SettingsWindow from './SettingsWindow'
+import { startThemeSync } from '../theme'
 import '../../styles/base.css'
 import './settings.css'
+
+startThemeSync()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

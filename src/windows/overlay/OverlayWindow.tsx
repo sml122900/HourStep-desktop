@@ -7,11 +7,18 @@ import {
   getCurrentWindow,
   primaryMonitor,
 } from '@tauri-apps/api/window'
+import {
+  cardMessage,
+  intervalMinutes,
+  normalizeBehavior,
+  restoreBuiltins,
+} from '../../core/behaviors'
 import { computeOverlayWindowPosition } from '../../core/overlayPosition'
-import { PRESET_BEHAVIORS } from '../../core/presets'
+import { seedBehaviors } from '../../core/presets'
 import { SNOOZE_MS, computeNextOccurrences, occurrenceId } from '../../core/scheduler'
-import { DEFAULT_SETTINGS, applySettings, type AppSettings } from '../../core/settings'
+import { DEFAULT_SETTINGS, type AppSettings } from '../../core/settings'
 import { computeSessionSummary, type Stats } from '../../core/stats'
+import { normalizeThemePreference } from '../../core/theme'
 import type {
   Behavior,
   CompletionAction,
@@ -21,7 +28,7 @@ import type {
 } from '../../core/types'
 import * as db from '../../data/db'
 import { formatDuration, formatRate } from '../../data/range'
-import { BEHAVIOR_MESSAGE, OVERLAY } from '../../constants/strings'
+import { OVERLAY } from '../../constants/strings'
 
 /** 슬라이드 아웃 CSS transition 시간과 맞춰야 한다 (overlay.css) */
 const SLIDE_OUT_MS = 220
@@ -42,7 +49,69 @@ type Phase = 'card' | 'offer' | 'counting'
 type Active =
   | { kind: 'behavior'; behavior: Behavior; occurrence: Occurrence }
   | { kind: 'idle' }
-  | { kind: 'summary'; stats: Stats }
+  /** labels: 요약을 만든 시점의 행동 이름. 세션 도중 이름을 바꾸거나 지워도 요약은 안 흔들린다 */
+  | { kind: 'summary'; stats: Stats; labels: Map<string, string> }
+
+/**
+ * `--debug-cmd` 의 행동 CRUD. 설정 창과 **같은 함수**(`saveBehaviorsAndBroadcast`)를 타야
+ * "클릭 없이 검증한 결과"가 실제 사용자 경로를 대변한다 (CLAUDE.md 「검증 정책」).
+ *
+ * spec: `add:<id>=<분>` / `delete:<id>` / `restore` / `interval:<id>=<분>`
+ */
+async function debugBehavior(spec: string): Promise<void> {
+  const separator = spec.indexOf(':')
+  const op = separator < 0 ? spec : spec.slice(0, separator)
+  const arg = separator < 0 ? '' : spec.slice(separator + 1)
+  const [id, rawMinutes] = arg.split('=')
+
+  try {
+    const current = await db.loadBehaviors()
+    let next: Behavior[]
+
+    switch (op) {
+      case 'add':
+        next = [
+          ...current,
+          normalizeBehavior({
+            id,
+            label: id,
+            emoji: '🧪',
+            message: `${id} 테스트 알림`,
+            rule: { kind: 'interval', everyMs: Number(rawMinutes) * 60_000 },
+            enabled: true,
+            sortOrder: current.length,
+          }),
+        ]
+        break
+      case 'delete':
+        next = current.filter((b) => b.id !== id)
+        break
+      case 'restore':
+        next = restoreBuiltins(current)
+        break
+      case 'interval':
+        next = current.map((b) =>
+          b.id === id ? { ...b, rule: { kind: 'interval' as const, everyMs: Number(rawMinutes) * 60_000 } } : b
+        )
+        break
+      default:
+        await invoke('log_debug', { line: `behavior 알 수 없는 명령: ${spec}` })
+        return
+    }
+
+    const saved = await db.saveBehaviorsAndBroadcast(next)
+    const applied = saved.find((b) => b.id === id)
+    // D2 e2e 스크립트가 이 형식을 파싱한다 — set-interval 의 출력은 바꾸지 않는다
+    await invoke('log_debug', {
+      line:
+        op === 'interval'
+          ? `settings ${id}.everyMinutes=${applied ? intervalMinutes(applied) : 'none'}`
+          : `behavior ${op} ${id ?? ''} n=${saved.length}`,
+    })
+  } catch (e) {
+    await invoke('log_debug', { line: `behavior ${spec} 실패: ${e}` })
+  }
+}
 
 export default function OverlayWindow() {
   const [active, setActiveState] = useState<Active | null>(null)
@@ -57,8 +126,11 @@ export default function OverlayWindow() {
   const firedRef = useRef<Set<string>>(new Set())
   /** 현재 세션의 기록. DB 에도 쓰지만 종료 요약은 이걸로 즉시 만든다 */
   const logsRef = useRef<CompletionLog[]>([])
-  /** 설정이 반영된 Behavior 목록 */
-  const behaviorsRef = useRef<Behavior[]>(PRESET_BEHAVIORS)
+  /**
+   * 지금 유효한 행동 목록. **런타임 소스는 DB** 이고 시드는 첫 로드 전 한 틱을 메우는 값이다
+   * (그 사이 tick 이 와도 엉뚱한 카드가 뜨지 않게 값이 비어 있지 않아야 한다).
+   */
+  const behaviorsRef = useRef<Behavior[]>(seedBehaviors())
   const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS)
   /** Rust tick 이 준 마지막 "지금". 가상 시각(`--debug-cmd tick:`)이 반영돼 있다. */
   const nowRef = useRef<number>(0)
@@ -104,6 +176,8 @@ export default function OverlayWindow() {
         behaviorId: current.behavior.id,
         action,
         at,
+        // 이름 스냅샷. 나중에 이 행동을 지워도 통계가 이름을 잃지 않는다 (docs/decisions/0006)
+        behaviorLabel: `${current.behavior.emoji} ${current.behavior.label}`,
       }
       logsRef.current.push(log)
 
@@ -212,10 +286,23 @@ export default function OverlayWindow() {
   }, [phase, hide])
 
   const reloadSettings = useCallback(async () => {
-    const settings = await db.loadSettings()
-    settingsRef.current = settings
-    behaviorsRef.current = applySettings(PRESET_BEHAVIORS, settings)
-    console.log('[overlay] 설정 반영', settings)
+    settingsRef.current = await db.loadSettings()
+    console.log('[overlay] 설정 반영', settingsRef.current)
+  }, [])
+
+  /**
+   * 행동 목록을 다시 읽는다. 실행 중인 세션에도 즉시 반영돼야 하므로 ref 만 갈아끼우고
+   * 나머지는 다음 tick 이 알아서 한다 — 발화 판단은 매 tick 순수 함수로 새로 계산한다.
+   *
+   * 이미 띄운 것(`firedRef`)은 지우지 않는다. 간격을 바꿨다고 방금 처리한 알림이
+   * 되살아나면 안 되기 때문. 새 간격은 다음 배수부터 적용된다.
+   */
+  const reloadBehaviors = useCallback(async () => {
+    behaviorsRef.current = await db.loadBehaviors()
+    console.log(
+      '[overlay] 행동 반영',
+      behaviorsRef.current.map((b) => `${b.id}:${intervalMinutes(b)}m:${b.enabled ? 'on' : 'off'}`)
+    )
   }, [])
 
   /** 세션 없이 N분이 지나면 한 번만 알린다. 세션이 시작/종료될 때 플래그가 리셋된다. */
@@ -326,11 +413,18 @@ export default function OverlayWindow() {
         at,
         behaviorsRef.current.filter((b) => b.enabled).map((b) => b.id)
       )
+      // 세션 도중 지워진 행동도 기록에 남은 이름 스냅샷으로 표시한다
+      const labels = new Map<string, string>()
+      for (const log of logsRef.current) {
+        if (log.behaviorLabel) labels.set(log.behaviorId, log.behaviorLabel)
+      }
+      for (const b of behaviorsRef.current) labels.set(b.id, `${b.emoji} ${b.label}`)
+
       console.log('[overlay] 세션 요약', stats)
       void invoke('log_overlay_action', {
         action: `summary worked=${stats.workedMs} total=${stats.overall.total} done=${stats.overall.done}`,
       })
-      openCard({ kind: 'summary', stats })
+      openCard({ kind: 'summary', stats, labels })
     },
     [hide, openCard]
   )
@@ -341,7 +435,8 @@ export default function OverlayWindow() {
       listen<{ startedAt: number | null; endedAt: number | null }>('session://changed', (e) =>
         applySession(e.payload.startedAt, e.payload.endedAt)
       ),
-      listen('settings://changed', () => void reloadSettings()),
+      listen(db.SETTINGS_CHANGED, () => void reloadSettings()),
+      listen(db.BEHAVIORS_CHANGED, () => void reloadBehaviors()),
       // 트레이 [테스트 알림] — 스케줄과 무관하게 한 장 띄운다
       listen<string>('overlay://show', (e) => {
         const behavior =
@@ -364,26 +459,27 @@ export default function OverlayWindow() {
           .then((line) => invoke('log_debug', { line }))
           .catch((e) => invoke('log_debug', { line: `db-dump 실패: ${e}` }))
       }),
-      // `--debug-cmd set-interval:<behaviorId>=<분>` — 설정 창의 저장 경로와 같은 함수를 탄다
-      listen<string>('overlay://debug-set-interval', (e) => {
-        const [behaviorId, raw] = e.payload.split('=')
+      // `--debug-cmd behaviors-dump` — 스케줄러가 실제로 받는 목록
+      listen('overlay://debug-behaviors-dump', () => {
+        void db
+          .summarizeBehaviors()
+          .then((line) => invoke('log_debug', { line }))
+          .catch((e) => invoke('log_debug', { line: `behaviors-dump 실패: ${e}` }))
+      }),
+      // `--debug-cmd behavior-add / behavior-delete / behavior-restore / set-interval`
+      listen<string>('overlay://debug-behavior', (e) => void debugBehavior(e.payload)),
+      // `--debug-cmd set-theme:<light|dark|system>`
+      listen<string>('overlay://debug-set-theme', (e) => {
         void db
           .loadSettings()
           .then((current) =>
             db.saveSettingsAndBroadcast({
               ...current,
-              behaviors: current.behaviors.map((b) =>
-                b.behaviorId === behaviorId ? { ...b, everyMinutes: Number(raw) } : b
-              ),
+              theme: normalizeThemePreference(e.payload),
             })
           )
-          .then((saved) => {
-            const applied = saved.behaviors.find((b) => b.behaviorId === behaviorId)
-            return invoke('log_debug', {
-              line: `settings ${behaviorId}.everyMinutes=${applied?.everyMinutes}`,
-            })
-          })
-          .catch((err) => invoke('log_debug', { line: `set-interval 실패: ${err}` }))
+          .then((saved) => invoke('log_debug', { line: `settings theme=${saved.theme}` }))
+          .catch((err) => invoke('log_debug', { line: `set-theme 실패: ${err}` }))
       }),
     ]
 
@@ -400,9 +496,9 @@ export default function OverlayWindow() {
       }
 
       try {
-        await reloadSettings()
+        await Promise.all([reloadSettings(), reloadBehaviors()])
       } catch (e) {
-        console.error('[overlay] 설정 로드 실패', e)
+        console.error('[overlay] 설정·행동 로드 실패', e)
       }
 
       const startedAt = await invoke<number | null>('current_session')
@@ -412,7 +508,7 @@ export default function OverlayWindow() {
     return () => {
       unlisteners.forEach((p) => void p.then((fn) => fn()))
     }
-  }, [onTick, applySession, openCard, dismiss, hide, reloadSettings])
+  }, [onTick, applySession, openCard, dismiss, hide, reloadSettings, reloadBehaviors])
 
   const seconds = Math.ceil(remainingMs / 1000)
 
@@ -459,7 +555,9 @@ export default function OverlayWindow() {
             </>
           )}
 
-          {active.kind === 'summary' && <SummaryCard stats={active.stats} onClose={hide} />}
+          {active.kind === 'summary' && (
+            <SummaryCard stats={active.stats} labels={active.labels} onClose={hide} />
+          )}
         </div>
       )}
     </div>
@@ -481,7 +579,7 @@ function BehaviorCard({
   onAcceptCountdown: () => void
   onClose: () => void
 }) {
-  const message = BEHAVIOR_MESSAGE[behavior.id] ?? behavior.label
+  const message = cardMessage(behavior)
 
   return (
     <>
@@ -533,7 +631,15 @@ function BehaviorCard({
   )
 }
 
-function SummaryCard({ stats, onClose }: { stats: Stats; onClose: () => void }) {
+function SummaryCard({
+  stats,
+  labels,
+  onClose,
+}: {
+  stats: Stats
+  labels: Map<string, string>
+  onClose: () => void
+}) {
   const recorded = stats.byBehavior.filter((s) => s.total > 0)
 
   return (
@@ -551,22 +657,17 @@ function SummaryCard({ stats, onClose }: { stats: Stats; onClose: () => void }) 
         <p className="card__note">{OVERLAY.SUMMARY_NO_RECORD}</p>
       ) : (
         <ul className="card__summary">
-          {recorded.map((stat) => {
-            const behavior = PRESET_BEHAVIORS.find((b) => b.id === stat.behaviorId)
-            return (
-              <li key={stat.behaviorId}>
-                <span>
-                  {behavior ? `${behavior.emoji} ${behavior.label}` : stat.behaviorId}
-                </span>
-                <span className="card__summary-rate">
-                  {formatRate(stat.rate)}
-                  <em>
-                    {stat.done}/{stat.total}
-                  </em>
-                </span>
-              </li>
-            )
-          })}
+          {recorded.map((stat) => (
+            <li key={stat.behaviorId}>
+              <span>{labels.get(stat.behaviorId) ?? stat.behaviorId}</span>
+              <span className="card__summary-rate">
+                {formatRate(stat.rate)}
+                <em>
+                  {stat.done}/{stat.total}
+                </em>
+              </span>
+            </li>
+          ))}
         </ul>
       )}
 

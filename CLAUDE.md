@@ -31,14 +31,20 @@
 WorkSession { id, startedAt, endedAt: number | null }         // 진행 중이면 endedAt null
 Behavior {
   id, label, emoji,
+  message,                                                    // 카드 문구 (비면 label)
   rule: { kind: 'interval', everyMs }                         // 세션 시작 기준 N ms 간격
       | { kind: 'atElapsed', atMs },                          // 세션 경과 특정 시점 1회
   intensity: 'toast' | 'card' | 'fullscreen',                 // MVP는 card만 구현
   enabled: boolean,
-  countdownMs?: number                                        // 완료 후 제안할 카운트다운
+  countdownMs?: number,                                       // 완료 후 제안할 카운트다운
+  isBuiltin: boolean,                                         // 기본 3종 표시 (근거 프로토콜 자리)
+  sortOrder: number                                           // 목록 순서, 0부터 연속
 }
 Occurrence { behaviorId, dueAt, origin: 'regular' | 'snooze' }  // 스케줄러 출력
-CompletionLog { occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at }
+CompletionLog {
+  occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at,
+  behaviorLabel?                                              // 기록 시점 이름 스냅샷 (0006)
+}
 ```
 - 스케줄러 시그니처: `computeNextOccurrences(session, behaviors, now, horizonMs, snoozes?): Occurrence[]`
   - `horizonMs` 는 now 로부터의 조회 **길이**(ms). 반환은 `[now, now+horizonMs]` 구간, dueAt 오름차순
@@ -47,10 +53,14 @@ CompletionLog { occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at
 - 스누즈(3분 뒤)는 단발 Occurrence 재삽입. 스누즈가 **다음(뒤쪽) 정규 알림**과 5분 이내 겹치면
   병합(정규 것만 유지). **이미 지나간 정규와는 병합하지 않는다** — 그러면 스누즈가 통째로 사라진다
 
-## 프리셋 루틴 (MVP 내장 1종)
+## 초기 시드 루틴 (내장 3종, `is_builtin`)
 - 🧘 스트레칭: 50분 간격, 완료 시 1분 카운트다운 제안
 - 💧 물마시기: 30분 간격
 - 👀 눈휴식(눈감고 1분): 60분 간격
+
+D2.5 부터 이건 **최초 시드이자 「기본값 복원」의 기준값**일 뿐이다. 런타임 행동 목록은
+DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·정렬한다 (`docs/decisions/0007`).
+`is_builtin` 은 향후 근거 기반 프로토콜을 붙일 자리 표시 — 실존 출처 전까지 인용 금지(규칙 6).
 
 ## Phase 로드맵
 - **D0 (완료)**: 스캐폴딩 + 트레이 상주 + 자동실행 + 오버레이 스파이크
@@ -58,6 +68,8 @@ CompletionLog { occurrenceId, behaviorId, action: 'done'|'snoozed'|'skipped', at
   + 투명영역 클릭 통과 + single-instance
 - **D2 (완료)**: SQLite 영속화 + 통계(오늘/최근 7일 작업시간·실천율) + 설정 화면
   + 세션 미시작 리마인더
+- **D2.5 (완료)**: 메인 창 세션 제어·실시간 타이머 + 행동 CRUD(마이그레이션 v2)
+  + 라이트/다크/시스템 테마
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
 
@@ -91,12 +103,19 @@ Windows 11 데스크톱 (개발 PC = 도그푸딩 기기). 실행: `pnpm tauri d
 ## 프로젝트 구조
 ```
 index.html / overlay.html / settings.html   창별 Vite 엔트리 (rollupOptions.input)
-src/constants/strings.ts                    UI 문구 (한국어)
+src/constants/strings.ts                    UI 문구 (한국어) + 내장 행동의 초기 카드 문구
 src/core/                                   IO 없는 순수 모듈 — React·Tauri import 금지 (eslint로 강제)
-  types.ts / scheduler.ts / presets.ts / stats.ts / settings.ts / overlayPosition.ts (+ *.test.ts)
+  types.ts / scheduler.ts / stats.ts / overlayPosition.ts
+  behaviors.ts                              행동 정규화·순서·기본값 복원·레거시 흡수
+  presets.ts                                시드 전용 (런타임 소스 아님)
+  settings.ts                               행동 아닌 앱 설정 (리마인더·테마)
+  theme.ts                                  선호 + OS 상태 → 실제 테마          (+ 각 *.test.ts)
 src/data/                                   IO 계층 — DB 접근은 전부 여기를 지난다
   db.ts                                     SQLite 어댑터 / range.ts 벽시계 구간·포맷
+src/windows/theme.ts                        data-theme 적용 + 설정·OS 변경 추종 (세 창이 각자 1회)
 src/windows/{main,overlay,settings}/        창별 React 앱
+  main/MainWindow.tsx                       세션 제어 + 실시간 타이머·예정 목록 + 통계
+  settings/SettingsWindow.tsx               행동 CRUD + 테마 + 리마인더 + autostart
   overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog·리마인더)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
 src-tauri/src/db.rs                         SQLite 스키마·마이그레이션 (읽기/쓰기는 TS 어댑터)
@@ -111,14 +130,25 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
 알림 주기 신호는 Rust 가 1초 tick(`app://tick`)으로 준다. 숨겨진 웹뷰에서는 Chromium 이
 `setTimeout`/`setInterval` 을 분 단위로 스로틀링해서 JS 타이머로는 50분 뒤 알림을 신뢰할 수 없다.
 무엇이 언제 뜰지는 오버레이 웹뷰의 TS 가 `computeNextOccurrences` 로 계산한다.
-**세션 상태(startedAt)의 단일 출처는 Rust**(`session.rs`), 기록·설정의 단일 출처는 SQLite.
+**세션 상태(startedAt)의 단일 출처는 Rust**(`session.rs`), 기록·설정·행동의 단일 출처는 SQLite.
+
+tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·다음 알림 카운트다운이
+오버레이의 발화 판단과 같은 시각을 봐야 하기 때문 — `Date.now()` 를 쓰면 `--debug-cmd tick:`
+의 가상 시각과 갈라져 "표시값 = 실제 발화"를 검증할 수 없다. 숨은 창은 `document.hidden`
+으로 렌더만 건너뛴다.
 
 ### 저장소
 `%APPDATA%\com.hourstep.desktop\hourstep.db` (SQLite, WAL). 스키마·마이그레이션은
 `src-tauri/src/db.rs` 가 소유하고, **읽기/쓰기는 `src/data/db.ts` 어댑터만** 한다.
-설정도 같은 파일의 `settings` 테이블에 JSON 한 덩어리로 넣는다 (근거: `docs/decisions/0003`).
-- 저장된 설정을 그대로 믿지 않는다 — `normalizeSettings()` 로 범위·타입을 정리한 뒤 쓴다.
-  설정 창은 사용자 입력이 들어오는 신뢰 경계다
+현재 마이그레이션 v2 (`work_sessions` / `completion_logs` / `settings` / `behaviors`).
+행동 아닌 설정은 `settings` 테이블에 JSON 한 덩어리 (근거: `docs/decisions/0003`),
+행동은 `behaviors` 테이블 (근거: `docs/decisions/0007`).
+- 저장된 값을 그대로 믿지 않는다 — `normalizeSettings()` / `normalizeBehaviors()` 로
+  범위·타입을 정리한 뒤 쓴다. **설정 창(사용자 입력)과 DB(구버전·손상) 둘 다 신뢰 경계다**
+- 시드는 마이그레이션 SQL 이 아니라 어댑터가 심는다(`seedBehaviorsIfEmpty`). 시드 값의
+  단일 출처를 `src/core/presets.ts` 한 곳에 두기 위해서 — 「기본값 복원」도 같은 함수를 탄다
+- 행동 삭제 후에도 통계가 살아남도록 `completion_logs.behavior_label` 에 기록 시점 이름을
+  스냅샷한다. FK `ON DELETE SET NULL` 을 쓰지 않는 이유는 `docs/decisions/0006`
 - 앱이 강제 종료되면 `ended_at IS NULL` 세션이 남는다. 기동 시 `closeDanglingSessions(bootedAt)`
   가 **마지막 기록 시각**으로 닫는다. `bootedAt` 인자는 필수 — 없으면 기동 직후 시작한
   살아 있는 세션까지 닫아버린다
@@ -134,11 +164,16 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
   명령: `wait:<ms>` / `start-session` / `end-session` / `tick:<ms>` /
   `overlay-show[:<behaviorId>]` / `overlay-hide` / `done` / `snoozed` / `skipped`
   (= `overlay-action:<action>`) / `settings-open` / `main-show` / `main-hide` /
-  `db-dump` / `set-interval:<behaviorId>=<분>` / `dump` / `quit`,
+  `db-dump` / `behaviors-dump` / `main-dump` / `set-interval:<behaviorId>=<분>` /
+  `behavior-add:<id>=<분>` / `behavior-delete:<id>` / `behavior-restore` /
+  `set-theme:<light|dark|system>` / `dump` / `quit`,
   맨 끝에 `loop` 를 붙이면 무한 반복
-- `db-dump` / `set-interval` 은 **DB 를 어댑터만 읽는다**는 규칙 때문에 Rust 가 직접 처리하지 않고
-  오버레이 웹뷰에 요청한다. 결과는 `log_debug` 를 타고 `[debug] …` 로 stdout 에 나온다.
-  `set-interval` 은 설정 창과 **같은 함수**(`saveSettingsAndBroadcast`)를 탄다
+- DB 를 만지는 명령(`db-dump` / `behaviors-dump` / `set-interval` / `behavior-*` / `set-theme`)은
+  **DB 를 어댑터만 읽는다**는 규칙 때문에 Rust 가 직접 처리하지 않고 오버레이 웹뷰에 요청한다.
+  결과는 `log_debug` 를 타고 `[debug] …` 로 stdout 에 나온다. 전부 설정 창과 **같은 함수**
+  (`saveSettingsAndBroadcast` / `saveBehaviorsAndBroadcast`)를 탄다
+- `main-dump` 는 메인 창이 **화면에 그리고 있는 값**(경과시간·다음 알림·남은 시간)을 찍는다.
+  `dump` 의 `clock.now`·`elapsedMs` 와 대조하면 타이머 표시값과 실제 발화 시각이 맞는지 보인다
 - **`tick:<ms>` 는 가상 시각을 앞으로 감는다.** 50분 간격 알림을 50분 기다리지 않고 검증하는 수단이고,
   스케줄러의 `now` 주입과 완전히 같은 경로다. 단 **정확히 due 시각에 착지해야 카드가 뜬다** —
   `STALE_MS`(2분)보다 밀린 occurrence 는 소진 처리되어 표시되지 않는다 (몰아 띄우기 방지)
@@ -151,6 +186,13 @@ src-tauri/capabilities/default.json         창 권한 — set-size 등 새 API 
   그래서 카드 CSS 에 바깥 여백·드롭섀도를 주면 안 된다 — 창 밖이라 잘리고, 여백은 죽은 영역이 된다
 - `fitWindow` 는 **표시가 먼저, 측정이 나중**이다. 숨겨진 WebView2 는 레이아웃을 안 돌려서
   `getBoundingClientRect()` 가 전부 0으로 나온다
+- **색은 전부 `src/styles/base.css` 토큰으로만 정의한다.** 창별 CSS 는 토큰만 참조 — 그래야
+  라이트/다크가 세 창 + 오버레이 카드에 한꺼번에 먹는다. `:root` 기본값이 다크인 건
+  속성이 붙기 전 한 프레임의 흰 번쩍임을 막기 위한 것
+- **설정 창은 "다시 보일 때" 다시 읽는다.** 창은 앱 기동 때 만들어져 한 번 읽고 숨어 있다가
+  나중에 보이므로, 그 사이 바뀐 값(다른 창의 복원, `--debug-cmd`)을 놓친다.
+  반대로 보이는 동안 오는 방송은 무시한다 — 대부분 자기가 낸 것이고, 그때 다시 읽으면
+  타이핑 중인 값을 덮어쓴다. 글자 입력은 blur(또는 창이 숨을 때) 저장, 나머지는 즉시 저장
 - pnpm 11+ 설정은 package.json 이 아니라 `pnpm-workspace.yaml` 에 둔다
 - 빌드 전제: Rust(stable-msvc) + **Windows SDK 컴포넌트**. SDK 없으면 `link.exe not found`
 - **dev 서버 포트는 1420 이 아니라 5183** (HMR 5184). Windows(Hyper-V/WinNAT)가 재부팅마다 임의

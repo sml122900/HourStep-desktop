@@ -15,6 +15,9 @@
 //!
 //! # 전체화면 테스트용 반복 표시 (C 항목)
 //! pnpm tauri dev -- -- -- --debug-cmd "wait:8000,overlay-show,wait:8000,overlay-hide,wait:12000,loop"
+//!
+//! # D2.5 행동 CRUD 가 실행 중 세션 스케줄에 즉시 반영되는가
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:4000,start-session,behavior-add:jump=7,wait:1500,behaviors-dump,tick:420000,wait:2500,dump,done,wait:1500,behavior-delete:jump,wait:1500,behaviors-dump,quit"
 //! ```
 //!
 //! 한계: 이 훅은 **자기 프로세스 안에서만** 동작한다. 이미 떠 있는 다른 인스턴스에는 명령을
@@ -74,6 +77,14 @@ pub fn spawn(app: &AppHandle, script: String) {
     });
 }
 
+/// DB 를 만지는 검증 명령은 Rust 가 직접 못 한다 — 읽기/쓰기는 `src/data/db.ts` 어댑터만
+/// 한다는 규칙(CLAUDE.md 「저장소」) 때문. 오버레이 웹뷰에 요청하고 결과는 `log_debug` 로 받는다.
+fn ask_overlay<T: serde::Serialize + Clone>(app: &AppHandle, event: &str, payload: T) {
+    if let Err(e) = app.emit_to(overlay::OVERLAY_LABEL, event, payload) {
+        eprintln!("[debug-cmd] {event} 전송 실패: {e}");
+    }
+}
+
 fn run_step(app: &AppHandle, step: &str) {
     let (cmd, arg) = match step.split_once(':') {
         Some((c, a)) => (c, Some(a)),
@@ -113,6 +124,14 @@ fn run_step(app: &AppHandle, step: &str) {
             }
         }
 
+        // 메인 창이 화면에 그리고 있는 값(경과시간·다음 알림 남은 시간)을 stdout 으로.
+        // `dump` 의 clock.now / elapsedMs 와 대조하면 표시값과 실제 발화 시각이 맞는지 보인다.
+        "main-dump" => {
+            if let Err(e) = app.emit_to(windows::MAIN_LABEL, "main://debug-dump", ()) {
+                eprintln!("[debug-cmd] main-dump 전송 실패: {e}");
+            }
+        }
+
         "settings-open" => windows::show_settings_window(app),
         "main-show" => windows::show_window(app, windows::MAIN_LABEL),
         "main-hide" => {
@@ -125,24 +144,37 @@ fn run_step(app: &AppHandle, step: &str) {
 
         // DB 는 어댑터(src/data/db.ts)만 읽는다. 그래서 Rust 가 직접 못 찍고 웹뷰에 요청한다 —
         // 결과는 `log_debug` 를 타고 `[debug] db ...` 로 stdout 에 나온다.
-        "db-dump" => {
-            if let Err(e) = app.emit_to(overlay::OVERLAY_LABEL, "overlay://debug-db-dump", ()) {
-                eprintln!("[debug-cmd] db-dump 전송 실패: {e}");
-            }
-        }
+        "db-dump" => ask_overlay(app, "overlay://debug-db-dump", ()),
 
-        // `set-interval:water=5` — 설정 창의 저장·방송 경로(saveSettingsAndBroadcast)를 그대로 탄다.
+        // 스케줄러가 실제로 받는 행동 목록. `[debug] behaviors n=… 0:stretch(🧘스트레칭,50m,on,builtin) …`
+        "behaviors-dump" => ask_overlay(app, "overlay://debug-behaviors-dump", ()),
+
+        // `set-interval:water=5` — 설정 창의 저장·방송 경로(saveBehaviorsAndBroadcast)를 그대로 탄다.
         // "설정 변경이 실행 중 세션 스케줄에 즉시 반영되는가"를 클릭 없이 검증하기 위한 것.
-        "set-interval" => {
-            let Some(spec) = arg else {
-                eprintln!("[debug-cmd] set-interval 은 '<behaviorId>=<분>' 형식이 필요합니다");
-                return;
-            };
-            if let Err(e) = app.emit_to(overlay::OVERLAY_LABEL, "overlay://debug-set-interval", spec)
-            {
-                eprintln!("[debug-cmd] set-interval 전송 실패: {e}");
-            }
-        }
+        "set-interval" => match arg {
+            Some(spec) => ask_overlay(app, "overlay://debug-behavior", format!("interval:{spec}")),
+            None => eprintln!("[debug-cmd] set-interval 은 '<behaviorId>=<분>' 형식이 필요합니다"),
+        },
+
+        // 행동 CRUD 도 설정 창과 같은 경로를 탄다 (D2.5 검증: 실행 중 세션에 즉시 반영되는가).
+        //   behavior-add:jump=7      새 행동을 7분 간격으로 추가
+        //   behavior-delete:water    삭제
+        //   behavior-restore         「기본값 복원」
+        "behavior-add" => match arg {
+            Some(spec) => ask_overlay(app, "overlay://debug-behavior", format!("add:{spec}")),
+            None => eprintln!("[debug-cmd] behavior-add 는 '<id>=<분>' 형식이 필요합니다"),
+        },
+        "behavior-delete" => match arg {
+            Some(id) => ask_overlay(app, "overlay://debug-behavior", format!("delete:{id}")),
+            None => eprintln!("[debug-cmd] behavior-delete 는 '<id>' 가 필요합니다"),
+        },
+        "behavior-restore" => ask_overlay(app, "overlay://debug-behavior", "restore".to_string()),
+
+        // `set-theme:light|dark|system` — 설정 창의 테마 저장 경로를 그대로 탄다.
+        "set-theme" => match arg {
+            Some(pref) => ask_overlay(app, "overlay://debug-set-theme", pref.to_string()),
+            None => eprintln!("[debug-cmd] set-theme 은 'light|dark|system' 이 필요합니다"),
+        },
 
         // 트레이 [종료] 와 같은 경로
         "quit" => {

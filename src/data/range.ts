@@ -42,6 +42,20 @@ export function formatDuration(ms: number): string {
   return `${hours}시간 ${minutes}분`
 }
 
+/**
+ * 초 단위 시계 표기 — `1:23:45` / `23:45`. 경과시간과 남은 시간 카운트다운에 함께 쓴다.
+ * 올림이 아니라 내림이면 카운트다운이 1초 먼저 0에 닿으므로 남은 시간은 올림한다.
+ */
+export function formatClock(ms: number, round: 'floor' | 'ceil' = 'floor'): string {
+  const total = Math[round](Math.max(0, ms) / 1000)
+  const s = total % 60
+  const m = Math.floor(total / 60) % 60
+  const h = Math.floor(total / 3600)
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
+}
+
 /** 실천율을 "75%" 로. 기록이 없으면(null) "—". */
 export function formatRate(rate: number | null): string {
   if (rate === null) return '—'

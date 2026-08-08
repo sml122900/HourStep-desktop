@@ -39,6 +39,7 @@ pub fn run() {
             overlay::hide_overlay,
             overlay::log_overlay_action,
             session::current_session,
+            session::end_session_command,
             session::log_completion,
             session::log_debug,
             session::start_session_command,

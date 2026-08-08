@@ -16,12 +16,15 @@ export const TRAY = {
 } as const
 
 /**
- * 행동별 카드 문구. key 는 src/core/presets.ts 의 Behavior.id.
+ * 내장 행동 3종의 **초기** 카드 문구. key 는 src/core/presets.ts 의 Behavior.id.
+ *
+ * D2.5 부터 문구는 사용자가 고칠 수 있는 데이터이고 DB(behaviors.message)가 런타임 소스다.
+ * 여기 값은 최초 시드와 「기본값 복원」이 되돌릴 기준값이다.
  *
  * CLAUDE.md 규칙 6: 건강 효용 문구는 연구 인용형("~라는 연구가 있어요")만 쓸 수 있고
  * 치료·개선 단정은 금지다. 지금은 **효용 주장을 아예 넣지 않았다** — 실제 출처 없이
  * "~라는 연구가 있어요" 를 지어내는 건 규칙을 지키는 게 아니라 어기는 것이기 때문.
- * 인용할 연구가 정해지면 아래 문구에 한 문장씩 덧붙이면 된다.
+ * 인용할 연구가 정해지면 아래 문구에 한 문장씩 덧붙이면 된다 (is_builtin 플래그가 그 자리다).
  */
 export const BEHAVIOR_MESSAGE: Record<string, string> = {
   // 사용자가 D0에서 직접 쓴 카피 — 그대로 유지 (CLAUDE.md 규칙 8)
@@ -65,6 +68,24 @@ export const SETTINGS = {
   BEHAVIORS_HINT: '변경하면 진행 중인 세션에도 바로 반영됩니다.',
   INTERVAL_SUFFIX: '분마다',
 
+  /** 행동 CRUD */
+  BEHAVIOR_ADD: '＋ 행동 추가',
+  BEHAVIOR_DELETE: '삭제',
+  BEHAVIOR_UP: '위로',
+  BEHAVIOR_DOWN: '아래로',
+  BEHAVIOR_RESTORE: '기본값 복원',
+  BEHAVIOR_RESTORE_HINT: '기본 3종을 처음 값으로 되돌립니다. 직접 만든 행동은 그대로 둡니다.',
+  BEHAVIOR_BUILTIN_TAG: '기본',
+  BEHAVIOR_NAME_PLACEHOLDER: '이름',
+  BEHAVIOR_MESSAGE_PLACEHOLDER: '알림 문구 (비우면 이름으로 표시돼요)',
+  BEHAVIOR_LIMIT: '행동은 최대 {n}개까지 만들 수 있어요.',
+  BEHAVIOR_EMPTY: '행동이 하나도 없어요. 추가하거나 기본값을 복원해 주세요.',
+
+  THEME_TITLE: '테마',
+  THEME_SYSTEM: '시스템',
+  THEME_LIGHT: '라이트',
+  THEME_DARK: '다크',
+
   IDLE_TITLE: '세션 미시작 알림',
   IDLE_LABEL: '작업 시작을 잊었을 때 한 번 알려주기',
   IDLE_SUFFIX: '분 후',
@@ -74,19 +95,29 @@ export const SETTINGS = {
 
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D2 — 통계 + 설정',
+  PHASE_BADGE: 'Phase D2.5 — 메인 화면 + 커스텀 행동',
   DESCRIPTION:
     '이 창을 닫아도 앱은 종료되지 않고 트레이에 남습니다. 종료는 트레이 메뉴에서만 가능합니다.',
   TEST_OVERLAY_BUTTON: '테스트 알림 띄우기',
-  OPEN_SETTINGS_BUTTON: '설정 열기',
+  OPEN_SETTINGS_BUTTON: '⚙️ 설정',
   HIDE_BUTTON: '트레이로 숨기기',
+
+  /** 세션 제어 + 타이머 */
+  SESSION_START: '▶ 작업 시작',
+  SESSION_END: '■ 작업 종료',
+  SESSION_ELAPSED: '작업 중',
+  SESSION_IDLE_TITLE: '쉬는 중',
+  SESSION_IDLE_HINT: '작업 시작하면 알림이 시작돼요',
+  NEXT_TITLE: '다음 알림',
+  NEXT_NONE: '켜진 행동이 없어요. 설정에서 하나 이상 켜주세요.',
+  UPCOMING_TITLE: '예정',
 
   STATS_TODAY: '오늘',
   STATS_WEEK: '최근 7일',
   STATS_WORKED: '작업시간',
   STATS_SESSIONS: '세션',
   STATS_RATE: '실천율',
-  STATS_EMPTY: '아직 기록이 없어요. 트레이에서 [▶ 작업 시작]을 눌러보세요.',
+  STATS_EMPTY: '아직 기록이 없어요. [▶ 작업 시작]을 눌러보세요.',
   STATS_SESSION_UNIT: '회',
   STATS_ACTIVE: '세션 진행 중',
 } as const

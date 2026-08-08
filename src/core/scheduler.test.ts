@@ -17,9 +17,12 @@ function behavior(over: Partial<Behavior> = {}): Behavior {
     id: 'water',
     label: '물마시기',
     emoji: '💧',
+    message: '물 한 잔 마실 시간이에요',
     rule: { kind: 'interval', everyMs: 30 * MIN },
     intensity: 'card',
     enabled: true,
+    isBuiltin: true,
+    sortOrder: 0,
     ...over,
   }
 }

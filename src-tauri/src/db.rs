@@ -10,7 +10,8 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 pub const DB_URL: &str = "sqlite:hourstep.db";
 
 pub fn migrations() -> Vec<Migration> {
-    vec![Migration {
+    vec![
+    Migration {
         version: 1,
         description: "create_sessions_logs_settings",
         kind: MigrationKind::Up,
@@ -43,5 +44,34 @@ pub fn migrations() -> Vec<Migration> {
             CREATE INDEX IF NOT EXISTS idx_logs_session    ON completion_logs(session_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_start  ON work_sessions(started_at);
         ",
-    }]
+    },
+    // D2.5 — 행동을 사용자가 직접 만들고 지운다. 하드코딩 프리셋이 아니라 이 표가 런타임 소스다.
+    // 시드는 여기서 INSERT 하지 않는다: 표가 비어 있으면 `src/data/db.ts` 가 `seedBehaviors()`
+    // 로 심는다. 문구·기본 간격의 단일 출처를 `src/core/presets.ts` 한 곳에 두기 위해서다.
+    Migration {
+        version: 2,
+        description: "behaviors_table_and_log_label",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE IF NOT EXISTS behaviors (
+                id           TEXT PRIMARY KEY,
+                label        TEXT NOT NULL,
+                emoji        TEXT NOT NULL,
+                message      TEXT NOT NULL DEFAULT '',
+                every_ms     INTEGER NOT NULL,
+                countdown_ms INTEGER,
+                enabled      INTEGER NOT NULL DEFAULT 1,
+                -- 내장 3종 표시. 향후 근거 기반 프로토콜을 붙일 자리 (지금은 플래그만)
+                is_builtin   INTEGER NOT NULL DEFAULT 0,
+                sort_order   INTEGER NOT NULL DEFAULT 0
+            );
+
+            -- 행동이 삭제돼도 과거 통계가 이름을 잃지 않도록 기록 시점 이름을 스냅샷한다.
+            -- FK + ON DELETE SET NULL 대신 스냅샷을 고른 근거: docs/decisions/0006
+            ALTER TABLE completion_logs ADD COLUMN behavior_label TEXT NOT NULL DEFAULT '';
+
+            CREATE INDEX IF NOT EXISTS idx_behaviors_order ON behaviors(sort_order);
+        ",
+    },
+    ]
 }

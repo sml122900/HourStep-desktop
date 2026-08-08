@@ -5,29 +5,175 @@ body {
 
 .shell {
   height: 100%;
-  padding: 28px 32px;
+  padding: 22px 28px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 14px;
   overflow-y: auto;
+}
+
+/* ─── 상단 ─── */
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .badge {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(79, 140, 255, 0.14);
-  border: 1px solid rgba(79, 140, 255, 0.3);
-  color: #9dbcff;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-text);
   font-size: 12px;
   letter-spacing: 0.01em;
 }
 
 h1 {
-  margin: 0;
-  font-size: 24px;
+  margin: 4px 0 0;
+  font-size: 23px;
   font-weight: 650;
+}
+
+.ghost {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  transition: background 120ms ease;
+}
+
+.ghost:hover {
+  background: var(--surface-hover);
+}
+
+/* ─── 세션 + 타이머 ─── */
+
+.session {
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.session__state {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+
+.session__elapsed {
+  display: block;
+  margin-top: 2px;
+  font-size: 34px;
+  font-weight: 650;
+  line-height: 1.1;
+  /* 자릿수가 바뀌어도 폭이 흔들리지 않게 — 매초 갱신되는 값이라 특히 중요하다 */
+  font-variant-numeric: tabular-nums;
+}
+
+.session__toggle {
+  flex: 0 0 auto;
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent-grad);
+  color: var(--accent-on);
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 120ms ease;
+}
+
+.session__toggle:hover {
+  background: var(--accent-grad-hover);
+}
+
+.session__toggle--end {
+  border-color: var(--border);
+  background: var(--row-bg);
+  color: var(--text);
+}
+
+.session__toggle--end:hover {
+  background: var(--surface-hover);
+}
+
+.next {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+}
+
+.next__label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.next__name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.next__time {
+  margin-left: auto;
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-text);
+}
+
+.upcoming {
+  display: flex;
+  gap: 12px;
+}
+
+.upcoming__label {
+  flex: 0 0 auto;
+  padding-top: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.upcoming ul {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.upcoming li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.upcoming__time {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── 통계 ─── */
@@ -67,9 +213,9 @@ h1 {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(79, 140, 255, 0.16);
-  border: 1px solid rgba(79, 140, 255, 0.3);
-  color: #9dbcff;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-text);
   white-space: nowrap;
 }
 
@@ -107,7 +253,7 @@ h1 {
   gap: 12px;
   font-size: 13px;
   padding: 4px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--hairline);
 }
 
 .behavior-stats__value {
@@ -133,7 +279,6 @@ h1 {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 6px;
 }
 
 .actions button {
@@ -146,11 +291,16 @@ h1 {
 }
 
 .actions button:hover {
-  background: #232733;
+  background: var(--surface-hover);
 }
 
 .hint {
-  margin-top: auto;
+  margin: 0;
   font-size: 13px;
-  color: #6f768a;
+  color: var(--text-faint);
+}
+
+.shell > .hint:last-child {
+  margin-top: auto;
+  padding-top: 4px;
 }

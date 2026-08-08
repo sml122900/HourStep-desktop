@@ -15,8 +15,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::overlay::OVERLAY_LABEL;
-
 /// `--debug-cmd tick:<ms>` 가 주입하는 가상 시각 오프셋.
 /// 릴리스 빌드에는 이걸 건드리는 경로가 없으므로 항상 0이다.
 static CLOCK_OFFSET_MS: AtomicI64 = AtomicI64::new(0);
@@ -116,20 +114,31 @@ fn emit_changed(app: &AppHandle, started_at: Option<i64>, ended_at: Option<i64>)
     }
 }
 
-/// 1초 tick 을 오버레이 웹뷰로 계속 보낸다. 세션 유무와 무관하게 돌고, 판단은 TS 가 한다.
+/// 1초 tick. 세션 유무와 무관하게 돌고, 판단은 TS 가 한다.
+///
+/// D2.5 부터 **모든 창**에 보낸다(원래는 오버레이 전용이었다). 메인 창의 경과시간·다음 알림
+/// 카운트다운이 오버레이의 발화 판단과 같은 시각을 봐야 하기 때문 — 메인 창이 `Date.now()` 를
+/// 쓰면 `--debug-cmd tick:` 의 가상 시각과 갈라져 표시값과 실제 발화가 어긋난다.
+/// 숨어 있는 창은 `document.hidden` 을 보고 렌더를 건너뛴다.
 pub fn spawn_tick(app: &AppHandle) {
     let handle = app.clone();
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(1));
-        let _ = handle.emit_to(OVERLAY_LABEL, "app://tick", Tick { now: now_ms() });
+        let _ = handle.emit("app://tick", Tick { now: now_ms() });
     });
 }
 
-/// 오버레이의 세션 미시작 리마인더에서 [▶ 작업 시작] 을 눌렀을 때.
-/// 트레이 메뉴와 완전히 같은 경로다.
+/// 오버레이의 세션 미시작 리마인더와 메인 창의 [▶ 작업 시작] 버튼.
+/// 트레이 메뉴와 완전히 같은 경로다 — 어디서 눌러도 `session://changed` 한 줄기로 합쳐진다.
 #[tauri::command]
 pub fn start_session_command(app: AppHandle) {
     start(&app);
+}
+
+/// 메인 창의 [■ 작업 종료] 버튼. 트레이 메뉴와 같은 경로.
+#[tauri::command]
+pub fn end_session_command(app: AppHandle) {
+    end(&app);
 }
 
 /// 오버레이 웹뷰가 뜬 직후 현재 세션 상태를 물어보는 용도.

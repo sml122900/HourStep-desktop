@@ -24,15 +24,16 @@ body,
   padding: 18px 22px 16px;
   border-radius: 18px;
 
-  background: linear-gradient(180deg, rgba(30, 34, 44, 0.96), rgba(20, 23, 30, 0.96));
+  background: var(--card-bg);
   /*
    * 바깥으로 번지는 그림자는 창 밖이라 잘려서 안 보인다 (창 = 카드 크기).
-   * 입체감은 테두리 + 안쪽 하이라이트로만 낸다.
+   * 입체감은 테두리 + 안쪽 하이라이트로만 낸다. 라이트에서는 밝은 배경에 묻히지 않도록
+   * 토큰 쪽에서 테두리를 더 진하게 잡아 뒀다 (styles/base.css).
    */
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--card-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 var(--card-inset-top),
+    inset 0 -1px 0 var(--card-inset-bottom);
   backdrop-filter: blur(22px) saturate(140%);
   color: var(--text);
 
@@ -70,8 +71,8 @@ body,
   place-items: center;
   font-size: 24px;
   border-radius: 14px;
-  background: rgba(79, 140, 255, 0.16);
-  border: 1px solid rgba(79, 140, 255, 0.26);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
 }
 
 .card__message {
@@ -113,7 +114,7 @@ body,
   font-size: 14px;
   padding: 5px 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--card-row-bg);
 }
 
 .card__summary-rate {
@@ -131,8 +132,8 @@ body,
 .btn {
   padding: 8px 15px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
   color: var(--text);
   font-size: 14px;
   font-weight: 500;
@@ -142,7 +143,7 @@ body,
 }
 
 .btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--btn-hover);
 }
 
 .btn:active {
@@ -150,14 +151,14 @@ body,
 }
 
 .btn--primary {
-  background: linear-gradient(180deg, #5b93ff, #3f79ee);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: var(--accent-grad);
+  border-color: var(--accent);
+  color: var(--accent-on);
   font-weight: 600;
 }
 
 .btn--primary:hover {
-  background: linear-gradient(180deg, #6b9fff, #4a83f5);
+  background: var(--accent-grad-hover);
 }
 
 .btn--ghost {
@@ -167,6 +168,6 @@ body,
 }
 
 .btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--btn-ghost-hover);
   color: var(--text);
 }
