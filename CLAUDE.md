@@ -177,7 +177,8 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   `ai-copy` ([📋 복사] 와 같은 경로로 클립보드에 쓴다 — 밖에서 `Get-Clipboard` 로 대조) /
   `main-show` / `main-hide` /
   `db-dump` / `behaviors-dump` / `main-dump` / `set-interval:<behaviorId>=<분>` /
-  `behavior-add:<id>=<분>` / `behavior-delete:<id>` / `behavior-restore` /
+  `behavior-add:<id>=<분>` / `behavior-delete:<id>` / `behavior-move:<id>=<up|down>` /
+  `behavior-restore` (**주의: 내장 3종을 시드값으로 되돌린다 — 사용자 편집이 날아간다**) /
   `ai-import[:<분>]` (고정 샘플 답변을 파싱→삽입, D2.6) /
   `set-theme:<light|dark|system>` / `dump` / `quit`,
   맨 끝에 `loop` 를 붙이면 무한 반복
@@ -192,7 +193,10 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   스케줄러의 `now` 주입과 완전히 같은 경로다. 단 **정확히 due 시각에 착지해야 카드가 뜬다** —
   `STALE_MS`(2분)보다 밀린 occurrence 는 소진 처리되어 표시되지 않는다 (몰아 띄우기 방지)
 - **single-instance 가 켜져 있다.** dev 인스턴스가 이미 떠 있으면 두 번째 실행은 조용히 죽는다.
-  스크립트를 돌리기 전에 `Get-Process hourstep-desktop` 로 확인할 것
+  스크립트를 돌리기 전에 `Get-Process hourstep-desktop` 로 확인할 것.
+  **설치본도 같은 프로세스 이름**이고 같은 DB(`%APPDATA%\com.hourstep.desktop`)를 쓴다 —
+  dev 로 검증하면 설치본의 사용자 데이터가 같이 바뀐다. 검증 전에 현재 값을 먼저 덤프해
+  기록해 둘 것 (2026-08-09 에 조사하다 `behavior-restore` 로 사용자 편집을 날린 적이 있다)
 - 오버레이 표시 여부는 `overlay::is_visible()` 로 확인. `WebviewWindow::is_visible()` 은
   raw Win32 로 show/hide 하는 탓에 항상 false 를 반환한다 (docs/decisions/0001)
 - 오버레이 창은 표시할 때마다 **카드 실크기로 리사이즈**된다 (`OverlayWindow.fitWindow`,

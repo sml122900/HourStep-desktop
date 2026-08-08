@@ -50,6 +50,20 @@ function clampMinutes(value: unknown, fallback: number): number {
   return rounded
 }
 
+/**
+ * 간격(분)을 허용 범위 **안으로 밀어 넣는다**. 범위 밖이면 시드로 되돌리는 `clampMinutes`
+ * 와 다르다 — 이건 사용자가 입력 중인 값을 고쳐 주는 쪽이다. 480 을 넘겨 치면 480 이 되고,
+ * 비었거나 0 이면 1 이 된다. 되돌리기보다 가까운 경계로 붙이는 게 입력 도중에는 덜 놀랍다.
+ */
+export function clampIntervalMinutes(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return MIN_INTERVAL_MINUTES
+  const rounded = Math.round(n)
+  if (rounded < MIN_INTERVAL_MINUTES) return MIN_INTERVAL_MINUTES
+  if (rounded > MAX_INTERVAL_MINUTES) return MAX_INTERVAL_MINUTES
+  return rounded
+}
+
 /** interval 행동의 간격(분). atElapsed 면 0 */
 export function intervalMinutes(behavior: Behavior): number {
   return behavior.rule.kind === 'interval' ? Math.round(behavior.rule.everyMs / MIN) : 0

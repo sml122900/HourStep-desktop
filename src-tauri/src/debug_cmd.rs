@@ -192,6 +192,12 @@ fn run_step(app: &AppHandle, step: &str) {
         },
         "behavior-restore" => ask_overlay(app, "overlay://debug-behavior", "restore".to_string()),
 
+        // `behavior-move:water=down` — 설정 창의 ↑/↓ 와 같은 경로 (moveBehavior 순수 함수)
+        "behavior-move" => match arg {
+            Some(spec) => ask_overlay(app, "overlay://debug-behavior", format!("move:{spec}")),
+            None => eprintln!("[debug-cmd] behavior-move 는 '<id>=<up|down>' 형식이 필요합니다"),
+        },
+
         // D2.6 — 「AI로 루틴 찾기」의 붙여넣기 이후 경로. 고정 샘플 답변을 파싱해서 삽입한다.
         // 검색·브라우저 열기는 여기에 없다 (자동 검증 대상이 아니다 — 눈으로 본다).
         //   ai-import[:<분>]   기본 3분

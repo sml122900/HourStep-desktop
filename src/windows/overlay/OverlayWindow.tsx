@@ -10,6 +10,7 @@ import {
 import {
   cardMessage,
   intervalMinutes,
+  moveBehavior,
   normalizeBehavior,
   restoreBuiltins,
 } from '../../core/behaviors'
@@ -57,7 +58,8 @@ type Active =
  * `--debug-cmd` 의 행동 CRUD. 설정 창과 **같은 함수**(`saveBehaviorsAndBroadcast`)를 타야
  * "클릭 없이 검증한 결과"가 실제 사용자 경로를 대변한다 (CLAUDE.md 「검증 정책」).
  *
- * spec: `add:<id>=<분>` / `delete:<id>` / `restore` / `interval:<id>=<분>` / `ai-import:<분>`
+ * spec: `add:<id>=<분>` / `delete:<id>` / `restore` / `interval:<id>=<분>` /
+ * `move:<id>=up|down` / `ai-import:<분>`
  */
 async function debugBehavior(spec: string): Promise<void> {
   const separator = spec.indexOf(':')
@@ -89,6 +91,11 @@ async function debugBehavior(spec: string): Promise<void> {
         break
       case 'restore':
         next = restoreBuiltins(current)
+        break
+      // `move:<id>=up|down` — 설정 창의 ↑/↓ 와 같은 순수 함수를 탄다.
+      // 순서는 지금까지 자동 검증 경로가 없어서 손으로만 확인할 수 있었다.
+      case 'move':
+        next = moveBehavior(current, id, rawMinutes === 'up' ? -1 : 1)
         break
       /**
        * D2.6 — 「AI로 루틴 찾기」의 **붙여넣기부터**를 클릭 없이 태운다.

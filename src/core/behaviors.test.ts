@@ -9,6 +9,7 @@ import {
   MIN_INTERVAL_MINUTES,
   applyLegacyBehaviorSettings,
   cardMessage,
+  clampIntervalMinutes,
   intervalMinutes,
   moveBehavior,
   newBehavior,
@@ -30,6 +31,28 @@ describe('seedBehaviors', () => {
     copy[0].rule = { kind: 'interval', everyMs: 1 }
     expect(SEED_BEHAVIORS[0].label).toBe('스트레칭')
     expect(intervalMinutes(SEED_BEHAVIORS[0])).toBe(50)
+  })
+})
+
+describe('clampIntervalMinutes', () => {
+  it('범위 밖은 가장 가까운 경계로 붙인다 (시드로 되돌리지 않는다)', () => {
+    expect(clampIntervalMinutes(0)).toBe(MIN_INTERVAL_MINUTES)
+    expect(clampIntervalMinutes(-5)).toBe(MIN_INTERVAL_MINUTES)
+    expect(clampIntervalMinutes(MAX_INTERVAL_MINUTES + 1)).toBe(MAX_INTERVAL_MINUTES)
+    expect(clampIntervalMinutes(99_999)).toBe(MAX_INTERVAL_MINUTES)
+  })
+
+  it('빈칸·숫자가 아닌 입력은 최소값으로 복구한다 (입력칸이 문자열을 넘긴다)', () => {
+    for (const bad of ['', '   ', 'abc', null, undefined, Number.NaN]) {
+      expect(clampIntervalMinutes(bad)).toBe(MIN_INTERVAL_MINUTES)
+    }
+  })
+
+  it('경계값과 소수는 그대로 / 반올림해서 통과한다', () => {
+    expect(clampIntervalMinutes(MIN_INTERVAL_MINUTES)).toBe(MIN_INTERVAL_MINUTES)
+    expect(clampIntervalMinutes(MAX_INTERVAL_MINUTES)).toBe(MAX_INTERVAL_MINUTES)
+    expect(clampIntervalMinutes('30')).toBe(30)
+    expect(clampIntervalMinutes(29.6)).toBe(30)
   })
 })
 

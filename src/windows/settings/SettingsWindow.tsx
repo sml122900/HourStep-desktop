@@ -4,10 +4,8 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   MAX_BEHAVIORS,
   MAX_EMOJI_CODEPOINTS,
-  MAX_INTERVAL_MINUTES,
   MAX_LABEL_LENGTH,
   MAX_MESSAGE_LENGTH,
-  MIN_INTERVAL_MINUTES,
   intervalMinutes,
   moveBehavior,
   newBehavior,
@@ -23,6 +21,7 @@ import { THEME_PREFERENCES, type ThemePreference } from '../../core/theme'
 import type { Behavior } from '../../core/types'
 import * as db from '../../data/db'
 import { AI, SETTINGS } from '../../constants/strings'
+import IntervalInput from './IntervalInput'
 import RoutineFinder from './RoutineFinder'
 
 const MIN = 60_000
@@ -117,6 +116,27 @@ export default function SettingsWindow() {
   const commit = useCallback(() => {
     if (draftRef.current) void persistBehaviors(draftRef.current)
   }, [persistBehaviors])
+
+  /**
+   * 간격만 따로 확정한다. 그냥 `commit` 을 쓰면 안 되는 이유 — 간격칸은 blur 에서 값을
+   * **복구**하는데(빈칸 → 1, 500 → 480), 그 복구값이 화면 상태에 반영되기 전에 커밋이
+   * 돌아 옛 값이 저장된다. 복구된 숫자를 직접 받아서 덮어쓴다.
+   * 나머지 칸의 미저장 편집은 `draftRef` 에 들어 있으므로 함께 저장된다.
+   */
+  const commitInterval = useCallback(
+    (behaviorId: string, minutes: number) => {
+      const current = draftRef.current
+      if (!current) return
+      void persistBehaviors(
+        current.map((b) =>
+          b.id === behaviorId
+            ? { ...b, rule: { kind: 'interval' as const, everyMs: minutes * MIN } }
+            : b
+        )
+      )
+    },
+    [persistBehaviors]
+  )
 
   /**
    * 「AI로 루틴 찾기」에서 확인한 항목을 실제 행동으로 넣는다. 직삽입 경로가 아니다 —
@@ -224,18 +244,15 @@ export default function SettingsWindow() {
                   )}
 
                   <span className="behavior__interval">
-                    <input
-                      type="number"
-                      min={MIN_INTERVAL_MINUTES}
-                      max={MAX_INTERVAL_MINUTES}
+                    <IntervalInput
                       value={intervalMinutes(behavior)}
                       disabled={!behavior.enabled}
-                      onChange={(e) =>
+                      onChange={(minutes) =>
                         editLocal(behavior.id, {
-                          rule: { kind: 'interval', everyMs: Number(e.target.value) * MIN },
+                          rule: { kind: 'interval', everyMs: minutes * MIN },
                         })
                       }
-                      onBlur={commit}
+                      onCommit={(minutes) => commitInterval(behavior.id, minutes)}
                     />
                     {SETTINGS.INTERVAL_SUFFIX}
                   </span>
