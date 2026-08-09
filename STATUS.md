@@ -5,7 +5,9 @@
 > 배경·규칙은 `CLAUDE.md`, 상세 기록은 `docs/daily/`·`docs/decisions/`.
 
 **마지막 갱신: 2026-08-09** · **현재 Phase: D2.8 완료(자동 검증까지) → 다음 D3**
-**설치본: 0.2.1** (`%LOCALAPPDATA%\HourStep`, NSIS per-user). 도그푸딩 기기에 설치 완료.
+**버전 0.3.0** — 설치본(`.exe`/`.msi`) 빌드 완료, **아직 설치하지 않았다**.
+도그푸딩 기기에 깔려 있는 것은 여전히 **0.2.1(D2.6 빌드)** (`%LOCALAPPDATA%\HourStep`, NSIS per-user).
+갱신하려면 `src-tauri\target\release\bundle\nsis\HourStep_0.3.0_x64-setup.exe` 실행.
 ⚠️ dev 와 설치본이 **같은 DB**(`%APPDATA%\com.hourstep.desktop\hourstep.db`)를 쓴다 —
 `--debug-cmd` 검증은 사용자 데이터를 바꾼다. 실제로 설정을 날린 적이 있다:
 `docs/troubleshooting/dev-and-installed-share-db.md`
@@ -99,7 +101,10 @@
   (`…/scratchpad/db-backup-pre-d2.7` 16:02 시점, `…/db-backup-pre-d2.8` 17:0x 시점).
   D2.8 검증은 행동·설정을 건드린 뒤 **전부 원래 값으로 되돌렸고 덤프로 대조했다**
   (스트레칭 30분/60초, 테마 system, 볼륨 60)
-- **설치본이 아직 0.2.1(D2.6 빌드)이다.** D2.7 을 도그푸딩하려면 다시 빌드해 설치해야 한다
+- **설치본이 아직 0.2.1(D2.6 빌드)이다.** 0.3.0 설치 파일은 만들어 뒀지만 **설치는 안 했다** —
+  D2.7·D2.8 을 도그푸딩하려면 `HourStep_0.3.0_x64-setup.exe` 를 실행해야 한다.
+  설치 후 마이그레이션 v4 가 기존 DB 에 적용된다(행위 시간 열 추가). 되돌릴 계획이면
+  `%APPDATA%\com.hourstep.desktop` 를 먼저 복사해 둘 것
 - **물마시기 간격이 원래 쓰던 값인지 확인 필요.** 2026-08-09 조사 중 `behavior-restore` 로
   사용자 편집을 덮었다. 스트레칭·눈휴식 30분과 순서는 로그로 복구했지만 물마시기만
   근거가 없어 시드값 30분을 넣어뒀다 (경위: `docs/troubleshooting/dev-and-installed-share-db.md`)
