@@ -12,20 +12,34 @@ import { DEFAULT_THEME, normalizeThemePreference, type ThemePreference } from '.
 export const MIN_IDLE_REMINDER_MINUTES = 1
 export const MAX_IDLE_REMINDER_MINUTES = 8 * 60
 
+/** 알림음 볼륨은 백분율 정수로 저장한다. 부동소수를 DB·JSON 에 왕복시키지 않기 위해서. */
+export const MIN_SOUND_VOLUME = 0
+export const MAX_SOUND_VOLUME = 100
+
 export interface AppSettings {
   /** 세션 미시작 리마인더 */
   idleReminderEnabled: boolean
   idleReminderMinutes: number
   theme: ThemePreference
+  /**
+   * 알림음. 전역 하나다 — 행동마다 소리를 다르게 두면 설정이 늘어나는 만큼 얻는 게 없다.
+   * 실제 재생은 오버레이 창이 한다 (메인 창은 숨어 있을 수 있다).
+   */
+  soundEnabled: boolean
+  /** 0~100. 0 이면 켜져 있어도 들리지 않는다 */
+  soundVolume: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   idleReminderEnabled: true,
   idleReminderMinutes: 30,
   theme: DEFAULT_THEME,
+  soundEnabled: true,
+  soundVolume: 60,
 }
 
-function clampMinutes(value: number, fallback: number, min: number, max: number): number {
+/** 범위 밖이면 **기본값으로 되돌린다** (경계로 붙이지 않는다 — 저장된 값이 손상된 경우다) */
+function clampRange(value: number, fallback: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return fallback
   const rounded = Math.round(value)
   if (rounded < min || rounded > max) return fallback
@@ -41,13 +55,23 @@ export function normalizeSettings(partial: Partial<AppSettings> | null | undefin
       typeof partial.idleReminderEnabled === 'boolean'
         ? partial.idleReminderEnabled
         : DEFAULT_SETTINGS.idleReminderEnabled,
-    idleReminderMinutes: clampMinutes(
+    idleReminderMinutes: clampRange(
       partial.idleReminderMinutes ?? DEFAULT_SETTINGS.idleReminderMinutes,
       DEFAULT_SETTINGS.idleReminderMinutes,
       MIN_IDLE_REMINDER_MINUTES,
       MAX_IDLE_REMINDER_MINUTES
     ),
     theme: normalizeThemePreference(partial.theme),
+    soundEnabled:
+      typeof partial.soundEnabled === 'boolean'
+        ? partial.soundEnabled
+        : DEFAULT_SETTINGS.soundEnabled,
+    soundVolume: clampRange(
+      partial.soundVolume ?? DEFAULT_SETTINGS.soundVolume,
+      DEFAULT_SETTINGS.soundVolume,
+      MIN_SOUND_VOLUME,
+      MAX_SOUND_VOLUME
+    ),
   }
 }
 

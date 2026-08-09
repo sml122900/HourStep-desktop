@@ -86,5 +86,27 @@ pub fn migrations() -> Vec<Migration> {
             ALTER TABLE behaviors ADD COLUMN source TEXT NOT NULL DEFAULT 'user';
         ",
     },
+    // D2.7 — 행위 자체에 걸리는 시간(초). 0 이면 즉시 행동(물마시기), 0 보다 크면
+    // [완료]가 카운트다운을 시작한다. D2 의 `countdown_ms`(하드코딩 60초 제안)를 대체한다.
+    //
+    // `countdown_ms` 열은 **지우지 않고 남겨 둔다**. SQLite 의 DROP COLUMN 은 버전을 타고,
+    // 이 마이그레이션이 실패하면 앱이 아예 안 켜진다. 값을 옮긴 뒤로는 아무도 읽지 않는다
+    // (어댑터의 SELECT/INSERT 목록에서 빠졌다).
+    Migration {
+        version: 4,
+        description: "behavior_duration_sec",
+        kind: MigrationKind::Up,
+        sql: "
+            ALTER TABLE behaviors ADD COLUMN duration_sec INTEGER NOT NULL DEFAULT 0;
+
+            -- 기존 카운트다운 값을 그대로 흡수한다. 사용자가 고쳐 둔 값이 있으면 그게 살아난다.
+            UPDATE behaviors SET duration_sec = countdown_ms / 1000 WHERE countdown_ms > 0;
+
+            -- 눈휴식은 「눈감고 1분」이 행동 정의 자체인데(CLAUDE.md 시드 루틴) D2 에는
+            -- 카운트다운이 붙어 있지 않아 흡수할 값이 없다. 내장 눈휴식에만, 아직 0 일 때만 채운다.
+            UPDATE behaviors SET duration_sec = 60
+             WHERE id = 'eyes' AND is_builtin = 1 AND duration_sec = 0;
+        ",
+    },
     ]
 }

@@ -21,6 +21,7 @@ function behavior(over: Partial<Behavior> = {}): Behavior {
     rule: { kind: 'interval', everyMs: 30 * MIN },
     intensity: 'card',
     enabled: true,
+    durationSec: 0,
     isBuiltin: true,
     source: 'user',
     sortOrder: 0,

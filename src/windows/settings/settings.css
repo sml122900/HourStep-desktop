@@ -82,7 +82,8 @@ input[type='checkbox'] {
 .behavior__emoji,
 .behavior__label,
 .behavior__message,
-.behavior__interval input[type='number'] {
+.behavior__interval input[type='number'],
+.behavior__duration input[type='number'] {
   padding: 5px 8px;
   border-radius: 7px;
   border: 1px solid var(--input-border);
@@ -111,8 +112,40 @@ input[type='checkbox'] {
 }
 
 .behavior__message:disabled,
-.behavior__interval input[type='number']:disabled {
+.behavior__interval input[type='number']:disabled,
+.behavior__duration input[type='number']:disabled {
   opacity: 0.45;
+}
+
+/*
+ * 행위 시간. 첫 줄(간격 옆)에 두기에는 그 줄이 이미 꽉 차 있어서 문구칸 아래로 내렸다.
+ * 값 옆의 안내는 0 과 양수의 차이를 말로 설명한다 — 「0초」가 무슨 뜻인지는 숫자만 봐서는 모른다.
+ */
+.behavior__duration {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.behavior__duration label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.behavior__duration input[type='number'] {
+  width: 62px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.behavior__duration em {
+  font-style: normal;
+  color: var(--text-faint);
 }
 
 .tag {
@@ -181,6 +214,34 @@ input[type='checkbox'] {
 
 .behavior__delete:hover {
   color: var(--danger);
+}
+
+/* ─── 알림음 ─── */
+
+.sound__label {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.sound__range {
+  flex: 1 1 auto;
+  max-width: 220px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sound__range:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 값이 30 → 5 로 줄 때 칸이 흔들리지 않게 폭을 고정한다 */
+.sound__value {
+  width: 3ch;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-dim);
 }
 
 /* ─── AI로 루틴 찾기 ─── */

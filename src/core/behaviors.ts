@@ -20,6 +20,14 @@ export const MAX_INTERVAL_MINUTES = 8 * 60
 /** 새 행동의 기본 간격 */
 export const DEFAULT_INTERVAL_MINUTES = 30
 
+/**
+ * 행위 시간(초) 허용 범위. **최소가 0 인 게 의미 있다** — 0 은 "값 없음"이 아니라
+ * 「완료를 누르면 바로 끝나는 즉시 행동」이라는 뜻이다 (물마시기).
+ * 상한 10분은 카드가 화면을 오래 붙잡지 않게 하는 선 — 그보다 긴 건 휴식이 아니라 일정이다.
+ */
+export const MIN_DURATION_SEC = 0
+export const MAX_DURATION_SEC = 600
+
 /** 행동 개수 상한. 카드가 몰려 뜨는 것도, DB 가 부푸는 것도 막는다 */
 export const MAX_BEHAVIORS = 20
 
@@ -64,6 +72,19 @@ export function clampIntervalMinutes(value: unknown): number {
   return rounded
 }
 
+/**
+ * 행위 시간(초)을 허용 범위 **안으로 밀어 넣는다**. `clampIntervalMinutes` 와 같은 성격 —
+ * 입력 중인 값을 되돌리지 않고 가까운 경계로 붙인다. 비었거나 숫자가 아니면 0(즉시 행동).
+ */
+export function clampDurationSeconds(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return MIN_DURATION_SEC
+  const rounded = Math.round(n)
+  if (rounded < MIN_DURATION_SEC) return MIN_DURATION_SEC
+  if (rounded > MAX_DURATION_SEC) return MAX_DURATION_SEC
+  return rounded
+}
+
 /** interval 행동의 간격(분). atElapsed 면 0 */
 export function intervalMinutes(behavior: Behavior): number {
   return behavior.rule.kind === 'interval' ? Math.round(behavior.rule.everyMs / MIN) : 0
@@ -98,8 +119,6 @@ export function normalizeBehavior(raw: Partial<Behavior>, fallback?: Behavior): 
             ) * MIN,
         }
 
-  const countdown = typeof raw.countdownMs === 'number' ? Math.round(raw.countdownMs) : 0
-
   return {
     id,
     label,
@@ -108,7 +127,9 @@ export function normalizeBehavior(raw: Partial<Behavior>, fallback?: Behavior): 
     rule,
     intensity: raw.intensity === 'toast' || raw.intensity === 'fullscreen' ? raw.intensity : 'card',
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-    ...(countdown > 0 ? { countdownMs: countdown } : {}),
+    // 모르는 값은 0(즉시 행동)이다. 시드로 되돌리지 않는다 — 사용자가 0 으로 바꿔둔 것과
+    // 값이 없는 것을 구분할 방법이 없고, 멋대로 카운트다운을 붙이는 쪽이 더 놀랍다
+    durationSec: clampDurationSeconds(raw.durationSec),
     isBuiltin: raw.isBuiltin === true,
     // 모르는 값은 'user'. AI 유래 표시는 붙일 때만 붙고, 아니면 붙지 않는 쪽이 안전하다
     source: (raw.source === 'ai' ? 'ai' : 'user') satisfies BehaviorSource,

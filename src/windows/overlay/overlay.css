@@ -83,6 +83,16 @@ body,
   line-height: 1.4;
 }
 
+/*
+ * 카운트다운 중. 눈을 감고 있다가 뜨거나 스트레칭 자세에서 곁눈질로 보는 숫자라
+ * 문구보다 크고, 자릿수가 바뀔 때 흔들리지 않게 고정폭 숫자로 그린다.
+ */
+.card__message--count {
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
 .card__actions {
   display: flex;
   gap: 8px;

@@ -24,8 +24,8 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     rule: { kind: 'interval', everyMs: 50 * MIN },
     intensity: 'card',
     enabled: true,
-    // CLAUDE.md 프리셋: "완료 시 1분 카운트다운 제안"
-    countdownMs: 1 * MIN,
+    // CLAUDE.md 프리셋: "완료 시 1분 카운트다운"
+    durationSec: 60,
     isBuiltin: true,
     source: 'user',
     sortOrder: 0,
@@ -38,6 +38,8 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     rule: { kind: 'interval', everyMs: 30 * MIN },
     intensity: 'card',
     enabled: true,
+    // 물 한 잔은 마시는 데 시간이 걸리는 행동이 아니다 — [완료]를 누르면 바로 끝난다
+    durationSec: 0,
     isBuiltin: true,
     source: 'user',
     sortOrder: 1,
@@ -50,6 +52,8 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     rule: { kind: 'interval', everyMs: 60 * MIN },
     intensity: 'card',
     enabled: true,
+    // 「눈감고 1분」이 행동 정의 자체다 (CLAUDE.md 시드 루틴)
+    durationSec: 60,
     isBuiltin: true,
     source: 'user',
     sortOrder: 2,

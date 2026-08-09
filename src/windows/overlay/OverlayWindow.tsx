@@ -15,6 +15,7 @@ import {
   restoreBuiltins,
 } from '../../core/behaviors'
 import { computeOverlayWindowPosition } from '../../core/overlayPosition'
+import { dequeueOccurrence, enqueueOccurrence, summarizeQueue } from '../../core/overlayQueue'
 import { seedBehaviors } from '../../core/presets'
 import { parseRoutineBlock, routineItemsToBehaviors } from '../../core/routineParse'
 import { SNOOZE_MS, computeNextOccurrences, occurrenceId } from '../../core/scheduler'
@@ -31,6 +32,7 @@ import type {
 import * as db from '../../data/db'
 import { formatDuration, formatRate } from '../../data/range'
 import { OVERLAY } from '../../constants/strings'
+import { playCue } from '../sound'
 
 /** 슬라이드 아웃 CSS transition 시간과 맞춰야 한다 (overlay.css) */
 const SLIDE_OUT_MS = 220
@@ -46,7 +48,11 @@ const TOP_GAP = 0
 /** 밀린 알림 소진 기준. 이보다 오래된 것은 표시하지 않고 버린다 (절전 복귀 시 카드 폭탄 방지) */
 const STALE_MS = 2 * 60_000
 
-type Phase = 'card' | 'offer' | 'counting'
+/**
+ * 카드의 두 모습. D2.6 까지 있던 `offer`(「1분만 같이 세어볼까요?」)는 D2.7 에서 없앴다 —
+ * 행위 시간이 행동의 속성이 되면서 "셀지 말지"는 매번 물을 일이 아니라 설정에서 정할 일이 됐다.
+ */
+type Phase = 'card' | 'counting'
 
 type Active =
   | { kind: 'behavior'; behavior: Behavior; occurrence: Occurrence }
@@ -121,8 +127,14 @@ async function debugBehavior(spec: string): Promise<void> {
 
       case 'interval':
         next = current.map((b) =>
-          b.id === id ? { ...b, rule: { kind: 'interval' as const, everyMs: Number(rawMinutes) * 60_000 } } : b
+          b.id === id
+            ? { ...b, rule: { kind: 'interval' as const, everyMs: Number(rawMinutes) * 60_000 } }
+            : b
         )
+        break
+      // D2.7 — 행위 시간(초). 60분 뒤 알림을 기다리지 않고 카운트다운 분기를 검증하기 위한 것
+      case 'duration':
+        next = current.map((b) => (b.id === id ? { ...b, durationSec: Number(rawMinutes) } : b))
         break
       default:
         await invoke('log_debug', { line: `behavior 알 수 없는 명령: ${spec}` })
@@ -136,6 +148,8 @@ async function debugBehavior(spec: string): Promise<void> {
     let line = `behavior ${op} ${id ?? ''} n=${saved.length}`
     if (op === 'interval') {
       line = `settings ${id}.everyMinutes=${applied ? intervalMinutes(applied) : 'none'}`
+    } else if (op === 'duration') {
+      line = `settings ${id}.durationSec=${applied ? applied.durationSec : 'none'}`
     } else if (op === 'ai-import') {
       // 삽입된 행동의 id 를 찍는다 — 이어지는 tick 이 무엇을 띄워야 하는지 대조할 수 있게
       const ai = saved.filter((b) => b.source === 'ai')
@@ -157,6 +171,11 @@ export default function OverlayWindow() {
   const activeRef = useRef<Active | null>(null)
   const sessionRef = useRef<WorkSession | null>(null)
   const snoozesRef = useRef<Occurrence[]>([])
+  /**
+   * 카드가 떠 있는 동안 도래해 대기 중인 발화. 창이 하나뿐이라 겹치면 덮어쓰는 문제를
+   * 큐로 직렬화한다 (docs/decisions/0009). 세션이 끝나면 통째로 버린다.
+   */
+  const queueRef = useRef<Occurrence[]>([])
   const firedRef = useRef<Set<string>>(new Set())
   /** 현재 세션의 기록. DB 에도 쓰지만 종료 요약은 이걸로 즉시 만든다 */
   const logsRef = useRef<CompletionLog[]>([])
@@ -184,19 +203,49 @@ export default function OverlayWindow() {
       setPhase('card')
       setSlidIn(false)
       setActive(next)
+
+      // ① 카드 표시 — 무조건, 행동 종류 무관. 요약 카드만 예외다: 사용자가 방금 [작업 종료]를
+      // 눌러서 뜬 것이고, 알림이 아니라 보고서라 소리로 부를 이유가 없다.
+      if (next.kind !== 'summary') {
+        void invoke('log_debug', { line: playCue('start', settingsRef.current) })
+      }
     },
     [setActive]
   )
 
+  /**
+   * 카드를 내린다. 슬라이드 아웃이 끝나면 **큐에 대기 중인 다음 알림을 이어서 띄운다** —
+   * 겹친 발화는 여기서 한 줄로 풀린다 (docs/decisions/0009).
+   *
+   * 이어 띄울 때는 창을 숨겼다 다시 띄우지 않는다. 한 프레임 깜빡이고, 어차피 같은 자리에
+   * 같은 크기로 다시 뜬다.
+   */
   const hide = useCallback(() => {
     setSlidIn(false)
     window.setTimeout(() => {
+      // 대기 중이던 행동이 그 사이 지워졌을 수 있다. 살아 있는 게 나올 때까지 꺼낸다.
+      let queue = queueRef.current
+      for (;;) {
+        const { next, rest } = dequeueOccurrence(queue)
+        queue = rest
+        if (!next) break
+
+        const behavior = behaviorsRef.current.find((b) => b.id === next.behaviorId)
+        if (!behavior) continue
+
+        queueRef.current = queue
+        void invoke('log_debug', { line: `queue pop ${occurrenceId(next)} n=${queue.length}` })
+        openCard({ kind: 'behavior', behavior, occurrence: next })
+        return
+      }
+
+      queueRef.current = queue
       void invoke('hide_overlay')
       setActive(null)
       setPhase('card')
       dismissingRef.current = false
     }, SLIDE_OUT_MS)
-  }, [setActive])
+  }, [setActive, openCard])
 
   const dismiss = useCallback(
     (action: CompletionAction) => {
@@ -238,10 +287,12 @@ export default function OverlayWindow() {
         })
       }
 
-      // 완료 + 카운트다운이 있는 행동이면 여기서 끝내지 않고 제안을 띄운다 (선택형)
-      if (action === 'done' && current.behavior.countdownMs) {
+      // 지속 행동이면 카드를 닫지 않고 그 자리에서 카운트다운으로 바뀐다.
+      // 기록은 이미 'done' 이다 — 중간에 [중단]해도 되돌리지 않는다 (사용자는 실제로 시작했다).
+      if (action === 'done' && current.behavior.durationSec > 0) {
         dismissingRef.current = false
-        setPhase('offer')
+        setRemainingMs(current.behavior.durationSec * 1000)
+        setPhase('counting')
         return
       }
 
@@ -282,7 +333,9 @@ export default function OverlayWindow() {
           },
           { width: size.width, height: size.height }
         )
-        await appWindow.setPosition(new PhysicalPosition(pos.x, pos.y + Math.round(TOP_GAP * scale)))
+        await appWindow.setPosition(
+          new PhysicalPosition(pos.x, pos.y + Math.round(TOP_GAP * scale))
+        )
       }
     } else {
       // 측정 실패해도 카드는 떠야 한다. tauri.conf.json 의 기본 크기로 간다 (죽은 영역은 남는다).
@@ -305,19 +358,21 @@ export default function OverlayWindow() {
   // 카운트다운 진행. 카드가 보이는 동안에만 도니까 웹뷰 스로틀링 영향이 없다.
   useEffect(() => {
     if (phase !== 'counting') return
-    const timer = window.setInterval(() => {
-      setRemainingMs((prev) => {
-        const next = prev - 1000
-        if (next <= 0) {
-          window.clearInterval(timer)
-          hide()
-          return 0
-        }
-        return next
-      })
-    }, 1000)
+    const timer = window.setInterval(() => setRemainingMs((prev) => Math.max(0, prev - 1000)), 1000)
     return () => window.clearInterval(timer)
-  }, [phase, hide])
+  }, [phase])
+
+  /**
+   * 카운트다운 종료 — ② 알림음 + 자동 닫힘.
+   *
+   * 소리와 닫기를 `setRemainingMs` **updater 안에서** 하지 않는 이유: updater 는 순수해야 하고,
+   * StrictMode 는 개발 중 그것을 두 번 호출한다. 소리가 두 번 울리고 hide 가 두 번 돈다.
+   */
+  useEffect(() => {
+    if (phase !== 'counting' || remainingMs > 0) return
+    void invoke('log_debug', { line: playCue('end', settingsRef.current) })
+    hide()
+  }, [phase, remainingMs, hide])
 
   const reloadSettings = useCallback(async () => {
     settingsRef.current = await db.loadSettings()
@@ -367,7 +422,6 @@ export default function OverlayWindow() {
         maybeRemindIdle(now)
         return
       }
-      if (activeRef.current) return
 
       const elapsed = now - session.startedAt
       if (elapsed <= 0) return
@@ -395,6 +449,21 @@ export default function OverlayWindow() {
         const behavior = behaviorsRef.current.find((b) => b.id === occurrence.behaviorId)
         if (!behavior) continue
         firedRef.current.add(id)
+
+        // 카드가 떠 있으면(카운트다운 포함) 덮어쓰지 않고 큐에 재운다. **무음** —
+        // 사용자는 이미 카드를 보고 있고, 여기서 소리가 나면 지금 하는 행동을 방해한다.
+        // 나머지 due 도 계속 훑는다: 긴 카운트다운 중에는 여러 건이 도래할 수 있다.
+        if (activeRef.current) {
+          const { queue, dropped } = enqueueOccurrence(queueRef.current, occurrence)
+          queueRef.current = queue
+          void invoke('log_debug', {
+            line:
+              `queue push ${id} n=${queue.length}` +
+              (dropped.length > 0 ? ` dropped=${dropped.map(occurrenceId).join(' ')}` : ''),
+          })
+          continue
+        }
+
         openCard({ kind: 'behavior', behavior, occurrence })
         return
       }
@@ -408,6 +477,7 @@ export default function OverlayWindow() {
         const session: WorkSession = { id: `s-${startedAt}`, startedAt, endedAt: null }
         sessionRef.current = session
         snoozesRef.current = []
+        queueRef.current = []
         firedRef.current.clear()
         logsRef.current = []
         idleSinceRef.current = null
@@ -426,6 +496,12 @@ export default function OverlayWindow() {
       const previous = sessionRef.current
       sessionRef.current = null
       snoozesRef.current = []
+      // 대기 중이던 발화는 통째로 버린다. 세션이 끝났는데 "아까 왔어야 할 알림"을
+      // 이제 와서 띄우면 그건 알림이 아니라 잔소리다 (기록도 남기지 않는다)
+      if (queueRef.current.length > 0) {
+        void invoke('log_debug', { line: `queue clear n=${queueRef.current.length}` })
+      }
+      queueRef.current = []
       firedRef.current.clear()
       const at = endedAt ?? nowRef.current
       idleSinceRef.current = at
@@ -500,8 +576,32 @@ export default function OverlayWindow() {
           .then((line) => invoke('log_debug', { line }))
           .catch((e) => invoke('log_debug', { line: `behaviors-dump 실패: ${e}` }))
       }),
-      // `--debug-cmd behavior-add / behavior-delete / behavior-restore / set-interval`
+      // `--debug-cmd behavior-add / behavior-delete / behavior-restore / set-interval / set-duration`
       listen<string>('overlay://debug-behavior', (e) => void debugBehavior(e.payload)),
+      // `--debug-cmd queue-dump` — 지금 대기 중인 발화. 큐 적재가 눈에 보이는 유일한 창구다
+      listen('overlay://debug-queue-dump', () => {
+        void invoke('log_debug', { line: summarizeQueue(queueRef.current) })
+      }),
+      // `--debug-cmd set-sound:<on|off|0-100>` — 설정 창과 같은 저장·방송 경로
+      listen<string>('overlay://debug-set-sound', (e) => {
+        const arg = e.payload.trim()
+        const volume = Number(arg)
+        void db
+          .loadSettings()
+          .then((current) =>
+            db.saveSettingsAndBroadcast(
+              Number.isFinite(volume) && arg !== ''
+                ? { ...current, soundVolume: volume }
+                : { ...current, soundEnabled: arg !== 'off' }
+            )
+          )
+          .then((saved) =>
+            invoke('log_debug', {
+              line: `settings sound=${saved.soundEnabled ? 'on' : 'off'} volume=${saved.soundVolume}`,
+            })
+          )
+          .catch((err) => invoke('log_debug', { line: `set-sound 실패: ${err}` }))
+      }),
       // `--debug-cmd set-theme:<light|dark|system>`
       listen<string>('overlay://debug-set-theme', (e) => {
         void db
@@ -557,10 +657,6 @@ export default function OverlayWindow() {
               phase={phase}
               seconds={seconds}
               onDismiss={dismiss}
-              onAcceptCountdown={() => {
-                setRemainingMs(active.behavior.countdownMs ?? 60_000)
-                setPhase('counting')
-              }}
               onClose={hide}
             />
           )}
@@ -603,14 +699,12 @@ function BehaviorCard({
   phase,
   seconds,
   onDismiss,
-  onAcceptCountdown,
   onClose,
 }: {
   behavior: Behavior
   phase: Phase
   seconds: number
   onDismiss: (action: CompletionAction) => void
-  onAcceptCountdown: () => void
   onClose: () => void
 }) {
   const message = cardMessage(behavior)
@@ -621,16 +715,15 @@ function BehaviorCard({
         <span className="card__icon" aria-hidden="true">
           {behavior.emoji}
         </span>
-        <p className="card__message">
-          {phase === 'card' && message}
-          {phase === 'offer' && OVERLAY.COUNTDOWN_OFFER}
-          {phase === 'counting' &&
-            `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}
+        <p className={`card__message${phase === 'counting' ? ' card__message--count' : ''}`}>
+          {phase === 'card'
+            ? message
+            : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}
         </p>
       </div>
 
       <div className="card__actions">
-        {phase === 'card' && (
+        {phase === 'card' ? (
           <>
             <button className="btn btn--primary" onClick={() => onDismiss('done')}>
               {OVERLAY.ACTION_DONE}
@@ -642,20 +735,8 @@ function BehaviorCard({
               {OVERLAY.ACTION_SKIP}
             </button>
           </>
-        )}
-
-        {phase === 'offer' && (
-          <>
-            <button className="btn btn--primary" onClick={onAcceptCountdown}>
-              {OVERLAY.COUNTDOWN_ACCEPT}
-            </button>
-            <button className="btn btn--ghost" onClick={onClose}>
-              {OVERLAY.COUNTDOWN_DECLINE}
-            </button>
-          </>
-        )}
-
-        {phase === 'counting' && (
+        ) : (
+          // 기록은 이미 'done' 으로 남았다. [중단]은 카운트다운만 멈춘다
           <button className="btn btn--ghost" onClick={onClose}>
             {OVERLAY.COUNTDOWN_STOP}
           </button>

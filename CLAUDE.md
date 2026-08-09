@@ -38,7 +38,7 @@ Behavior {
       | { kind: 'atElapsed', atMs },                          // 세션 경과 특정 시점 1회
   intensity: 'toast' | 'card' | 'fullscreen',                 // MVP는 card만 구현
   enabled: boolean,
-  countdownMs?: number,                                       // 완료 후 제안할 카운트다운
+  durationSec: number,                                        // 행위 시간. 0=즉시 행동, >0=[완료]가 카운트다운 시작
   isBuiltin: boolean,                                         // 기본 3종 표시 (근거 프로토콜 자리)
   source: 'user' | 'ai',                                      // 문구 출처. 'ai' 는 D2.6 브리지로 가져온 것
   sortOrder: number                                           // 목록 순서, 0부터 연속
@@ -56,11 +56,14 @@ CompletionLog {
 - `occurrenceId(o)` = `` `${behaviorId}@${dueAt}` `` — CompletionLog 가 참조하는 안정적 식별자
 - 스누즈(3분 뒤)는 단발 Occurrence 재삽입. 스누즈가 **다음(뒤쪽) 정규 알림**과 5분 이내 겹치면
   병합(정규 것만 유지). **이미 지나간 정규와는 병합하지 않는다** — 그러면 스누즈가 통째로 사라진다
+- 카드가 떠 있는 동안 도래한 Occurrence 는 **덮어쓰지 않고 큐로 직렬화**한다
+  (`src/core/overlayQueue.ts`, 상한 5건, 세션 종료 시 폐기, 근거: `docs/decisions/0009`).
+  큐는 병합하지 않는다 — 겹친 두 행동은 둘 다 해야 할 일이고 기록도 따로 남아야 한다
 
 ## 초기 시드 루틴 (내장 3종, `is_builtin`)
-- 🧘 스트레칭: 50분 간격, 완료 시 1분 카운트다운 제안
-- 💧 물마시기: 30분 간격
-- 👀 눈휴식(눈감고 1분): 60분 간격
+- 🧘 스트레칭: 50분 간격, 행위 시간 60초 (완료 시 1분 카운트다운)
+- 💧 물마시기: 30분 간격, 행위 시간 0초 (완료 즉시 종료)
+- 👀 눈휴식(눈감고 1분): 60분 간격, 행위 시간 60초
 
 D2.5 부터 이건 **최초 시드이자 「기본값 복원」의 기준값**일 뿐이다. 런타임 행동 목록은
 DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·정렬한다 (`docs/decisions/0007`).
@@ -76,6 +79,8 @@ DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·�
   + 라이트/다크/시스템 테마
 - **D2.6 (완료)**: AI 검색 브리지 — 프롬프트 생성·복사 + AI 이동 + 붙여넣기 파서
   (마이그레이션 v3). **앱이 AI 결과를 직접 읽지 않는다** (`docs/decisions/0008`)
+- **D2.7 (완료)**: 행위 지속 시간(마이그레이션 v4) + 알림음(WebAudio 합성, 2지점)
+  + 발화 큐 (`docs/decisions/0009`)
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
 
@@ -113,19 +118,21 @@ src/constants/strings.ts                    UI 문구 (한국어) + 내장 행�
 src/core/                                   IO 없는 순수 모듈 — React·Tauri import 금지 (eslint로 강제)
   types.ts / scheduler.ts / stats.ts / overlayPosition.ts
   behaviors.ts                              행동 정규화·순서·기본값 복원·레거시 흡수
+  overlayQueue.ts                           발화 큐 — 카드가 떠 있는 동안 도래한 것의 적재·인출
   aiQuery.ts / routineParse.ts              AI 브리지 — 프롬프트·이동 주소 / 붙여넣기 파서
   presets.ts                                시드 전용 (런타임 소스 아님)
-  settings.ts                               행동 아닌 앱 설정 (리마인더·테마)
+  settings.ts                               행동 아닌 앱 설정 (리마인더·테마·알림음)
   theme.ts                                  선호 + OS 상태 → 실제 테마          (+ 각 *.test.ts)
 src/data/                                   IO 계층 — DB 접근은 전부 여기를 지난다
   db.ts                                     SQLite 어댑터 / range.ts 벽시계 구간·포맷
 src/windows/theme.ts                        data-theme 적용 + 설정·OS 변경 추종 (세 창이 각자 1회)
+src/windows/sound.ts                        알림음 WebAudio 합성 (오버레이가 재생, 설정은 미리듣기만)
 src/windows/{main,overlay,settings}/        창별 React 앱
   main/MainWindow.tsx                       세션 제어 + 실시간 타이머·예정 목록 + 통계
-  settings/SettingsWindow.tsx               행동 CRUD + 테마 + 리마인더 + autostart
+  settings/SettingsWindow.tsx               행동 CRUD + 테마 + 알림음 + 리마인더 + autostart
   settings/RoutineFinder.tsx                AI 브리지 UI (프롬프트→이동→붙여넣기→미리보기→삽입)
-  settings/IntervalInput.tsx                간격(분) 입력칸 — 입력 중 문자열, blur 에 경계 복구
-  overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·CompletionLog·리마인더)이 여기 산다
+  settings/NumberInput.tsx                  간격(분)·행위 시간(초) 입력칸 — 입력 중 문자열, blur 에 경계 복구
+  overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·큐·카운트다운·CompletionLog)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
 src-tauri/src/db.rs                         SQLite 스키마·마이그레이션 (읽기/쓰기는 TS 어댑터)
 src-tauri/src/session.rs                    세션 상태 + 1초 tick + 가상 시각
@@ -149,7 +156,7 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
 ### 저장소
 `%APPDATA%\com.hourstep.desktop\hourstep.db` (SQLite, WAL). 스키마·마이그레이션은
 `src-tauri/src/db.rs` 가 소유하고, **읽기/쓰기는 `src/data/db.ts` 어댑터만** 한다.
-현재 마이그레이션 v3 (`work_sessions` / `completion_logs` / `settings` / `behaviors`).
+현재 마이그레이션 v4 (`work_sessions` / `completion_logs` / `settings` / `behaviors`).
 행동 아닌 설정은 `settings` 테이블에 JSON 한 덩어리 (근거: `docs/decisions/0003`),
 행동은 `behaviors` 테이블 (근거: `docs/decisions/0007`).
 - 저장된 값을 그대로 믿지 않는다 — `normalizeSettings()` / `normalizeBehaviors()` 로
@@ -160,6 +167,8 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   스냅샷한다. FK `ON DELETE SET NULL` 을 쓰지 않는 이유는 `docs/decisions/0006`
 - `behaviors.source` (v3) 는 문구 출처(`'user'|'ai'`)다. `is_builtin` 을 겸용하지 않는 이유는
   `docs/decisions/0008` — 한 열에 두 의미를 태우면 둘 중 하나는 어긋난다
+- `behaviors.duration_sec` (v4) 가 행위 시간이다. v3 의 `countdown_ms` 값을 흡수했고
+  그 열은 **아무도 읽지 않는 채 남아 있다** (SQLite DROP COLUMN 이 버전을 타서 안 지웠다)
 - 앱이 강제 종료되면 `ended_at IS NULL` 세션이 남는다. 기동 시 `closeDanglingSessions(bootedAt)`
   가 **마지막 기록 시각**으로 닫는다. `bootedAt` 인자는 필수 — 없으면 기동 직후 시작한
   살아 있는 세션까지 닫아버린다
@@ -177,14 +186,17 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   (= `overlay-action:<action>`) / `settings-open[:ai]` (`:ai` 는 AI 패널까지 펼친다) /
   `ai-copy` ([📋 복사] 와 같은 경로로 클립보드에 쓴다 — 밖에서 `Get-Clipboard` 로 대조) /
   `main-show` / `main-hide` /
-  `db-dump` / `behaviors-dump` / `main-dump` / `set-interval:<behaviorId>=<분>` /
+  `db-dump` / `behaviors-dump` / `queue-dump` / `main-dump` / `set-interval:<behaviorId>=<분>` /
+  `set-duration:<behaviorId>=<초>` / `set-sound:<on|off|0-100>` /
   `behavior-add:<id>=<분>` / `behavior-delete:<id>` / `behavior-move:<id>=<up|down>` /
   `behavior-restore` (**주의: 내장 3종을 시드값으로 되돌린다 — 사용자 편집이 날아간다**) /
   `ai-import[:<분>]` (고정 샘플 답변을 파싱→삽입, D2.6) /
   `set-theme:<light|dark|system>` / `dump` / `quit`,
   맨 끝에 `loop` 를 붙이면 무한 반복
-- DB 를 만지는 명령(`db-dump` / `behaviors-dump` / `set-interval` / `behavior-*` / `ai-import` /
-  `set-theme`)은
+- 알림음은 `[debug] sound start …` / `sound end …` 로 stdout 에 남는다 (실제 소리는 귀로).
+  큐는 `queue push … / queue pop … / queue clear …` 와 `queue-dump` 로 본다
+- DB 를 만지는 명령(`db-dump` / `behaviors-dump` / `set-interval` / `set-duration` /
+  `set-sound` / `behavior-*` / `ai-import` / `set-theme`)은
   **DB 를 어댑터만 읽는다**는 규칙 때문에 Rust 가 직접 처리하지 않고 오버레이 웹뷰에 요청한다.
   결과는 `log_debug` 를 타고 `[debug] …` 로 stdout 에 나온다. 전부 설정 창과 **같은 함수**
   (`saveSettingsAndBroadcast` / `saveBehaviorsAndBroadcast`)를 탄다
@@ -205,6 +217,12 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   그래서 카드 CSS 에 바깥 여백·드롭섀도를 주면 안 된다 — 창 밖이라 잘리고, 여백은 죽은 영역이 된다
 - `fitWindow` 는 **표시가 먼저, 측정이 나중**이다. 숨겨진 WebView2 는 레이아웃을 안 돌려서
   `getBoundingClientRect()` 가 전부 0으로 나온다
+- **알림음은 파일이 아니라 WebAudio 합성이다** (`src/windows/sound.ts`). 재생 주체는 **오버레이 창** —
+  메인 창은 트레이로 숨어 있을 수 있다. 웹뷰가 사용자 조작 전 오디오를 재우지 않도록
+  `tauri.conf.json` 의 세 창 모두에 `additionalBrowserArgs` 로
+  `--autoplay-policy=no-user-gesture-required` 를 준다. **세 창이 같은 문자열이어야 한다** —
+  WebView2 환경은 창끼리 공유되므로 창마다 다른 인자를 주면 창 생성이 실패할 수 있다.
+  기본값(`--disable-features=msWebOOUI,…`)을 덮어쓰는 자리라 그 인자도 함께 적어야 한다
 - **색은 전부 `src/styles/base.css` 토큰으로만 정의한다.** 창별 CSS 는 토큰만 참조 — 그래야
   라이트/다크가 세 창 + 오버레이 카드에 한꺼번에 먹는다. `:root` 기본값이 다크인 건
   속성이 붙기 전 한 프레임의 흰 번쩍임을 막기 위한 것

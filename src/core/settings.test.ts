@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SETTINGS,
   MAX_IDLE_REMINDER_MINUTES,
+  MAX_SOUND_VOLUME,
   MIN_IDLE_REMINDER_MINUTES,
+  MIN_SOUND_VOLUME,
   extractLegacyBehaviors,
   normalizeSettings,
 } from './settings'
@@ -28,6 +30,21 @@ describe('normalizeSettings', () => {
     expect(
       normalizeSettings({ idleReminderMinutes: MAX_IDLE_REMINDER_MINUTES + 1 }).idleReminderMinutes
     ).toBe(DEFAULT_SETTINGS.idleReminderMinutes)
+  })
+
+  it('알림음 볼륨 경계값은 통과하고, 범위 밖은 기본값으로 되돌린다', () => {
+    for (const ok of [MIN_SOUND_VOLUME, MAX_SOUND_VOLUME, 35]) {
+      expect(normalizeSettings({ soundVolume: ok }).soundVolume).toBe(ok)
+    }
+    for (const bad of [-1, MAX_SOUND_VOLUME + 1, Number.NaN]) {
+      expect(normalizeSettings({ soundVolume: bad }).soundVolume).toBe(DEFAULT_SETTINGS.soundVolume)
+    }
+  })
+
+  it('알림음은 기본으로 켜져 있고, 명시적 false 만 끈다', () => {
+    expect(DEFAULT_SETTINGS.soundEnabled).toBe(true)
+    expect(normalizeSettings({ soundEnabled: false }).soundEnabled).toBe(false)
+    expect(normalizeSettings({ soundEnabled: 0 as never }).soundEnabled).toBe(true)
   })
 
   it('테마 3택을 보존한다', () => {

@@ -37,10 +37,10 @@ export const OVERLAY = {
   ACTION_DONE: '✅ 완료',
   ACTION_SNOOZE: '⏰ 3분 뒤',
   ACTION_SKIP: '건너뛰기',
-  /** 완료 후 카운트다운 제안 (선택형) */
-  COUNTDOWN_OFFER: '1분만 같이 세어볼까요?',
-  COUNTDOWN_ACCEPT: '⏱ 좋아요',
-  COUNTDOWN_DECLINE: '괜찮아요',
+  /**
+   * 행위 시간이 있는 행동은 [완료]가 곧바로 카운트다운을 시작한다 (D2.7).
+   * D2 의 「1분만 같이 세어볼까요?」 제안 단계는 없앴다 — 셀지 말지는 설정에서 정한다.
+   */
   COUNTDOWN_STOP: '그만하기',
 
   /** 세션 미시작 리마인더 — 세션당 한 번만 뜬다 */
@@ -68,6 +68,12 @@ export const SETTINGS = {
   BEHAVIORS_HINT: '변경하면 진행 중인 세션에도 바로 반영됩니다.',
   INTERVAL_SUFFIX: '분마다',
 
+  /** 행위 시간 — [완료]를 누른 뒤 카드가 함께 세어줄 시간 */
+  DURATION_LABEL: '행위 시간',
+  DURATION_SUFFIX: '초',
+  DURATION_ZERO_HINT: '완료를 누르면 바로 끝나요',
+  DURATION_HINT: '완료를 누르면 {n}초를 같이 세어드려요',
+
   /** 행동 CRUD */
   BEHAVIOR_ADD: '＋ 행동 추가',
   BEHAVIOR_DELETE: '삭제',
@@ -85,6 +91,12 @@ export const SETTINGS = {
   THEME_SYSTEM: '시스템',
   THEME_LIGHT: '라이트',
   THEME_DARK: '다크',
+
+  SOUND_TITLE: '알림음',
+  SOUND_LABEL: '카드가 뜰 때와 카운트다운이 끝날 때 소리로 알리기',
+  SOUND_VOLUME: '볼륨',
+  SOUND_PREVIEW: '🔊 미리듣기',
+  SOUND_HINT: '소리는 알림 카드가 냅니다. 창을 닫아 트레이에 있어도 들려요.',
 
   IDLE_TITLE: '세션 미시작 알림',
   IDLE_LABEL: '작업 시작을 잊었을 때 한 번 알려주기',
@@ -150,7 +162,7 @@ export const AI = {
 
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D2.6 — AI 검색 브리지',
+  PHASE_BADGE: 'Phase D2.7 — 행위 시간 · 알림음 · 발화 큐',
   DESCRIPTION:
     '이 창을 닫아도 앱은 종료되지 않고 트레이에 남습니다. 종료는 트레이 메뉴에서만 가능합니다.',
   TEST_OVERLAY_BUTTON: '테스트 알림 띄우기',

@@ -3,9 +3,15 @@ import { listen } from '@tauri-apps/api/event'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   MAX_BEHAVIORS,
+  MAX_DURATION_SEC,
   MAX_EMOJI_CODEPOINTS,
+  MAX_INTERVAL_MINUTES,
   MAX_LABEL_LENGTH,
   MAX_MESSAGE_LENGTH,
+  MIN_DURATION_SEC,
+  MIN_INTERVAL_MINUTES,
+  clampDurationSeconds,
+  clampIntervalMinutes,
   intervalMinutes,
   moveBehavior,
   newBehavior,
@@ -13,7 +19,9 @@ import {
 } from '../../core/behaviors'
 import {
   MAX_IDLE_REMINDER_MINUTES,
+  MAX_SOUND_VOLUME,
   MIN_IDLE_REMINDER_MINUTES,
+  MIN_SOUND_VOLUME,
   type AppSettings,
 } from '../../core/settings'
 import { routineItemsToBehaviors, type RoutineItem } from '../../core/routineParse'
@@ -21,7 +29,8 @@ import { THEME_PREFERENCES, type ThemePreference } from '../../core/theme'
 import type { Behavior } from '../../core/types'
 import * as db from '../../data/db'
 import { AI, SETTINGS } from '../../constants/strings'
-import IntervalInput from './IntervalInput'
+import { playCue } from '../sound'
+import NumberInput from './NumberInput'
 import RoutineFinder from './RoutineFinder'
 
 const MIN = 60_000
@@ -118,22 +127,16 @@ export default function SettingsWindow() {
   }, [persistBehaviors])
 
   /**
-   * 간격만 따로 확정한다. 그냥 `commit` 을 쓰면 안 되는 이유 — 간격칸은 blur 에서 값을
-   * **복구**하는데(빈칸 → 1, 500 → 480), 그 복구값이 화면 상태에 반영되기 전에 커밋이
-   * 돌아 옛 값이 저장된다. 복구된 숫자를 직접 받아서 덮어쓴다.
+   * 숫자칸(간격·행위 시간)을 확정한다. 그냥 `commit` 을 쓰면 안 되는 이유 — 이 칸들은
+   * blur 에서 값을 **복구**하는데(빈칸 → 1분, 500 → 480분), 그 복구값이 화면 상태에
+   * 반영되기 전에 커밋이 돌아 옛 값이 저장된다. 복구된 숫자를 직접 받아서 덮어쓴다.
    * 나머지 칸의 미저장 편집은 `draftRef` 에 들어 있으므로 함께 저장된다.
    */
-  const commitInterval = useCallback(
-    (behaviorId: string, minutes: number) => {
+  const commitField = useCallback(
+    (behaviorId: string, patch: Partial<Behavior>) => {
       const current = draftRef.current
       if (!current) return
-      void persistBehaviors(
-        current.map((b) =>
-          b.id === behaviorId
-            ? { ...b, rule: { kind: 'interval' as const, everyMs: minutes * MIN } }
-            : b
-        )
-      )
+      void persistBehaviors(current.map((b) => (b.id === behaviorId ? { ...b, ...patch } : b)))
     },
     [persistBehaviors]
   )
@@ -239,20 +242,26 @@ export default function SettingsWindow() {
                     <span className="tag">{SETTINGS.BEHAVIOR_BUILTIN_TAG}</span>
                   )}
                   {/* 우리가 지어낸 문구가 아니라 사용자가 AI 답변에서 가져온 것이라는 표시 */}
-                  {behavior.source === 'ai' && (
-                    <span className="tag tag--ai">{AI.SOURCE_TAG}</span>
-                  )}
+                  {behavior.source === 'ai' && <span className="tag tag--ai">{AI.SOURCE_TAG}</span>}
 
                   <span className="behavior__interval">
-                    <IntervalInput
+                    <NumberInput
                       value={intervalMinutes(behavior)}
+                      min={MIN_INTERVAL_MINUTES}
+                      max={MAX_INTERVAL_MINUTES}
+                      clamp={clampIntervalMinutes}
                       disabled={!behavior.enabled}
+                      ariaLabel={`${behavior.label} 간격(분)`}
                       onChange={(minutes) =>
                         editLocal(behavior.id, {
                           rule: { kind: 'interval', everyMs: minutes * MIN },
                         })
                       }
-                      onCommit={(minutes) => commitInterval(behavior.id, minutes)}
+                      onCommit={(minutes) =>
+                        commitField(behavior.id, {
+                          rule: { kind: 'interval', everyMs: minutes * MIN },
+                        })
+                      }
                     />
                     {SETTINGS.INTERVAL_SUFFIX}
                   </span>
@@ -261,7 +270,9 @@ export default function SettingsWindow() {
                     <button
                       title={SETTINGS.BEHAVIOR_UP}
                       disabled={index === 0}
-                      onClick={() => void persistBehaviors(moveBehavior(behaviors, behavior.id, -1))}
+                      onClick={() =>
+                        void persistBehaviors(moveBehavior(behaviors, behavior.id, -1))
+                      }
                     >
                       ↑
                     </button>
@@ -294,6 +305,29 @@ export default function SettingsWindow() {
                   onChange={(e) => editLocal(behavior.id, { message: e.target.value })}
                   onBlur={commit}
                 />
+
+                {/* 행위 시간. 0 이면 [완료] 즉시 끝, 0 보다 크면 카드가 그만큼 같이 세어준다 */}
+                <span className="behavior__duration">
+                  <label>
+                    {SETTINGS.DURATION_LABEL}
+                    <NumberInput
+                      value={behavior.durationSec}
+                      min={MIN_DURATION_SEC}
+                      max={MAX_DURATION_SEC}
+                      clamp={clampDurationSeconds}
+                      disabled={!behavior.enabled}
+                      ariaLabel={`${behavior.label} ${SETTINGS.DURATION_LABEL}(${SETTINGS.DURATION_SUFFIX})`}
+                      onChange={(seconds) => editLocal(behavior.id, { durationSec: seconds })}
+                      onCommit={(seconds) => commitField(behavior.id, { durationSec: seconds })}
+                    />
+                    {SETTINGS.DURATION_SUFFIX}
+                  </label>
+                  <em>
+                    {behavior.durationSec === 0
+                      ? SETTINGS.DURATION_ZERO_HINT
+                      : SETTINGS.DURATION_HINT.replace('{n}', String(behavior.durationSec))}
+                  </em>
+                </span>
               </li>
             ))}
           </ul>
@@ -347,6 +381,57 @@ export default function SettingsWindow() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2>{SETTINGS.SOUND_TITLE}</h2>
+        <label className="row">
+          <input
+            type="checkbox"
+            checked={settings?.soundEnabled ?? false}
+            disabled={settings === null}
+            onChange={(e) =>
+              settings && void persist({ ...settings, soundEnabled: e.target.checked })
+            }
+          />
+          <span>{SETTINGS.SOUND_LABEL}</span>
+        </label>
+
+        <div className="row">
+          <span className="sound__label">{SETTINGS.SOUND_VOLUME}</span>
+          {/*
+            드래그하는 내내 저장하면 DB 쓰기와 방송이 수십 번 나간다. 화면만 먼저 움직이고
+            손을 뗄 때(또는 키보드 조작이 끝날 때) 한 번 저장한다.
+          */}
+          <input
+            type="range"
+            className="sound__range"
+            min={MIN_SOUND_VOLUME}
+            max={MAX_SOUND_VOLUME}
+            step={5}
+            value={settings?.soundVolume ?? 0}
+            disabled={settings === null || !settings.soundEnabled}
+            aria-label={SETTINGS.SOUND_VOLUME}
+            onChange={(e) =>
+              settings && setSettings({ ...settings, soundVolume: Number(e.target.value) })
+            }
+            onPointerUp={() => settings && void persist(settings)}
+            onKeyUp={() => settings && void persist(settings)}
+            onBlur={() => settings && void persist(settings)}
+          />
+          <span className="sound__value">{settings?.soundVolume ?? 0}</span>
+
+          {/* 소리는 눌러보기 전엔 알 수 없다. 볼륨을 맞추려면 들어봐야 한다 */}
+          <button
+            className="chip"
+            disabled={settings === null || !settings.soundEnabled}
+            onClick={() => settings && playCue('start', settings)}
+          >
+            {SETTINGS.SOUND_PREVIEW}
+          </button>
+        </div>
+
+        <p className="hint">{SETTINGS.SOUND_HINT}</p>
       </section>
 
       <section>

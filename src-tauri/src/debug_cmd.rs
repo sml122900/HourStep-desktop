@@ -21,6 +21,9 @@
 //!
 //! # D2.6 AI 루틴 삽입 → 발화까지 (붙여넣기 파싱 → 저장 → 실행 중 세션 반영)
 //! pnpm tauri dev -- -- -- --debug-cmd "wait:5000,start-session,wait:1000,ai-import:3,wait:2000,behaviors-dump,tick:180000,wait:2500,dump,done,wait:1500,db-dump,quit"
+//!
+//! # D2.7 카운트다운 + 발화 큐: 카드 → 완료(카운트다운 시작) → 그 사이 다른 행동 도래 → 큐 → 자동 이어 표시
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:5000,behavior-add:q1=3,behavior-add:q2=4,set-duration:q1=8,start-session,wait:1500,tick:180000,wait:2500,dump,done,wait:1000,tick:60000,wait:2000,queue-dump,wait:9000,dump,queue-dump,quit"
 //! ```
 //!
 //! 한계: 이 훅은 **자기 프로세스 안에서만** 동작한다. 이미 떠 있는 다른 인스턴스에는 명령을
@@ -168,14 +171,31 @@ fn run_step(app: &AppHandle, step: &str) {
         // 결과는 `log_debug` 를 타고 `[debug] db ...` 로 stdout 에 나온다.
         "db-dump" => ask_overlay(app, "overlay://debug-db-dump", ()),
 
-        // 스케줄러가 실제로 받는 행동 목록. `[debug] behaviors n=… 0:stretch(🧘스트레칭,50m,on,builtin) …`
+        // 스케줄러가 실제로 받는 행동 목록.
+        // `[debug] behaviors n=… 0:stretch(🧘스트레칭,50m,60s,on,builtin) …`
         "behaviors-dump" => ask_overlay(app, "overlay://debug-behaviors-dump", ()),
+
+        // D2.7 — 카드가 떠 있는 동안 밀려 대기 중인 발화. 큐는 화면에 안 보이므로 이게 유일한 창구다.
+        // `[debug] queue n=1 water@1754...`
+        "queue-dump" => ask_overlay(app, "overlay://debug-queue-dump", ()),
 
         // `set-interval:water=5` — 설정 창의 저장·방송 경로(saveBehaviorsAndBroadcast)를 그대로 탄다.
         // "설정 변경이 실행 중 세션 스케줄에 즉시 반영되는가"를 클릭 없이 검증하기 위한 것.
         "set-interval" => match arg {
             Some(spec) => ask_overlay(app, "overlay://debug-behavior", format!("interval:{spec}")),
             None => eprintln!("[debug-cmd] set-interval 은 '<behaviorId>=<분>' 형식이 필요합니다"),
+        },
+
+        // `set-duration:eyes=5` — 행위 시간(초). 카운트다운 분기를 60초 기다리지 않고 검증한다.
+        "set-duration" => match arg {
+            Some(spec) => ask_overlay(app, "overlay://debug-behavior", format!("duration:{spec}")),
+            None => eprintln!("[debug-cmd] set-duration 은 '<behaviorId>=<초>' 형식이 필요합니다"),
+        },
+
+        // `set-sound:off` / `set-sound:on` / `set-sound:40` — 설정 창의 저장·방송 경로를 그대로 탄다
+        "set-sound" => match arg {
+            Some(spec) => ask_overlay(app, "overlay://debug-set-sound", spec.to_string()),
+            None => eprintln!("[debug-cmd] set-sound 는 'on|off|0-100' 이 필요합니다"),
         },
 
         // 행동 CRUD 도 설정 창과 같은 경로를 탄다 (D2.5 검증: 실행 중 세션에 즉시 반영되는가).

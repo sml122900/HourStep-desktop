@@ -4,7 +4,14 @@ import { listen } from '@tauri-apps/api/event'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { AI_TARGETS, buildAiUrl, buildRoutinePrompt, type AiTarget } from '../../core/aiQuery'
-import { MAX_EMOJI_CODEPOINTS, MAX_LABEL_LENGTH, MAX_MESSAGE_LENGTH } from '../../core/behaviors'
+import {
+  MAX_EMOJI_CODEPOINTS,
+  MAX_INTERVAL_MINUTES,
+  MAX_LABEL_LENGTH,
+  MAX_MESSAGE_LENGTH,
+  MIN_INTERVAL_MINUTES,
+  clampIntervalMinutes,
+} from '../../core/behaviors'
 import {
   ROUTINE_FALLBACK_EMOJI,
   parseRoutineBlock,
@@ -12,7 +19,7 @@ import {
   type RoutineParseResult,
 } from '../../core/routineParse'
 import { AI } from '../../constants/strings'
-import IntervalInput from './IntervalInput'
+import NumberInput from './NumberInput'
 
 /** 이모지 입력 상한. maxLength 는 UTF-16 단위라 코드포인트의 2배로 잡는다 (설정 창과 동일) */
 const EMOJI_MAXLENGTH = MAX_EMOJI_CODEPOINTS * 2
@@ -293,10 +300,14 @@ export default function RoutineFinder({
                       />
                       <span className="behavior__interval">
                         {/* 미리보기 줄도 설정 목록과 같은 입력칸을 쓴다 (지우는 중 0 으로 튀지 않게) */}
-                        <IntervalInput
+                        <NumberInput
                           value={row.minutes}
-                          onChange={(minutes) => editRow(index, { minutes })}
-                          onCommit={(minutes) => editRow(index, { minutes })}
+                          min={MIN_INTERVAL_MINUTES}
+                          max={MAX_INTERVAL_MINUTES}
+                          clamp={clampIntervalMinutes}
+                          ariaLabel="간격(분)"
+                          onChange={(minutes: number) => editRow(index, { minutes })}
+                          onCommit={(minutes: number) => editRow(index, { minutes })}
                         />
                         분마다
                       </span>

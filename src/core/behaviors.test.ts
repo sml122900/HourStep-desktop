@@ -3,12 +3,15 @@ import {
   DEFAULT_INTERVAL_MINUTES,
   FALLBACK_EMOJI,
   MAX_BEHAVIORS,
+  MAX_DURATION_SEC,
   MAX_INTERVAL_MINUTES,
   MAX_LABEL_LENGTH,
   MAX_MESSAGE_LENGTH,
+  MIN_DURATION_SEC,
   MIN_INTERVAL_MINUTES,
   applyLegacyBehaviorSettings,
   cardMessage,
+  clampDurationSeconds,
   clampIntervalMinutes,
   intervalMinutes,
   moveBehavior,
@@ -32,6 +35,14 @@ describe('seedBehaviors', () => {
     expect(SEED_BEHAVIORS[0].label).toBe('스트레칭')
     expect(intervalMinutes(SEED_BEHAVIORS[0])).toBe(50)
   })
+
+  it('행위 시간 시드 — 스트레칭 60초 / 물 0초(즉시) / 눈휴식 60초', () => {
+    expect(seedBehaviors().map((b) => [b.id, b.durationSec])).toEqual([
+      ['stretch', 60],
+      ['water', 0],
+      ['eyes', 60],
+    ])
+  })
 })
 
 describe('clampIntervalMinutes', () => {
@@ -53,6 +64,32 @@ describe('clampIntervalMinutes', () => {
     expect(clampIntervalMinutes(MAX_INTERVAL_MINUTES)).toBe(MAX_INTERVAL_MINUTES)
     expect(clampIntervalMinutes('30')).toBe(30)
     expect(clampIntervalMinutes(29.6)).toBe(30)
+  })
+})
+
+describe('clampDurationSeconds', () => {
+  it('0 은 유효한 값이다 — 「즉시 행동」이지 값 없음이 아니다', () => {
+    expect(clampDurationSeconds(0)).toBe(0)
+    expect(clampDurationSeconds('0')).toBe(0)
+  })
+
+  it('범위 밖은 가장 가까운 경계로 붙인다', () => {
+    expect(clampDurationSeconds(-1)).toBe(MIN_DURATION_SEC)
+    expect(clampDurationSeconds(MAX_DURATION_SEC + 1)).toBe(MAX_DURATION_SEC)
+    expect(clampDurationSeconds(99_999)).toBe(MAX_DURATION_SEC)
+  })
+
+  it('빈칸·숫자가 아닌 입력은 0 으로 (입력칸이 문자열을 넘긴다)', () => {
+    for (const bad of ['', '   ', 'abc', null, undefined, Number.NaN]) {
+      expect(clampDurationSeconds(bad)).toBe(0)
+    }
+  })
+
+  it('경계값과 소수는 그대로 / 반올림해서 통과한다', () => {
+    expect(clampDurationSeconds(MIN_DURATION_SEC)).toBe(MIN_DURATION_SEC)
+    expect(clampDurationSeconds(MAX_DURATION_SEC)).toBe(MAX_DURATION_SEC)
+    expect(clampDurationSeconds('60')).toBe(60)
+    expect(clampDurationSeconds(59.6)).toBe(60)
   })
 })
 
@@ -108,9 +145,16 @@ describe('normalizeBehavior', () => {
     expect(normalizeBehavior({ id: 'a', isBuiltin: true }).isBuiltin).toBe(true)
   })
 
-  it('countdownMs 가 0 이하면 아예 넣지 않는다', () => {
-    expect(normalizeBehavior({ id: 'a', countdownMs: 0 })).not.toHaveProperty('countdownMs')
-    expect(normalizeBehavior({ id: 'a', countdownMs: 60_000 }).countdownMs).toBe(60_000)
+  it('행위 시간이 없으면 0(즉시 행동) — 시드 값으로 되돌리지 않는다', () => {
+    expect(normalizeBehavior({ id: 'a' }).durationSec).toBe(0)
+    // 사용자가 스트레칭을 즉시 행동으로 바꿔 뒀다면 그 선택이 살아남아야 한다
+    expect(normalizeBehavior({ ...seedBehaviors()[0], durationSec: 0 }).durationSec).toBe(0)
+  })
+
+  it('행위 시간은 경계 안으로 밀어 넣는다', () => {
+    expect(normalizeBehavior({ id: 'a', durationSec: -30 }).durationSec).toBe(MIN_DURATION_SEC)
+    expect(normalizeBehavior({ id: 'a', durationSec: 99_999 }).durationSec).toBe(MAX_DURATION_SEC)
+    expect(normalizeBehavior({ id: 'a', durationSec: 60 }).durationSec).toBe(60)
   })
 
   it('atElapsed 규칙은 그대로 보존한다', () => {

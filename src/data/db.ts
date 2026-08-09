@@ -7,11 +7,7 @@
 
 import { emit } from '@tauri-apps/api/event'
 import Database from '@tauri-apps/plugin-sql'
-import {
-  applyLegacyBehaviorSettings,
-  intervalMinutes,
-  normalizeBehaviors,
-} from '../core/behaviors'
+import { applyLegacyBehaviorSettings, intervalMinutes, normalizeBehaviors } from '../core/behaviors'
 import { seedBehaviors } from '../core/presets'
 import type { AppSettings } from '../core/settings'
 import { extractLegacyBehaviors, normalizeSettings } from '../core/settings'
@@ -54,7 +50,7 @@ interface BehaviorRow {
   emoji: string
   message: string
   every_ms: number
-  countdown_ms: number | null
+  duration_sec: number
   enabled: number
   is_builtin: number
   source: string
@@ -84,7 +80,8 @@ const toBehavior = (r: BehaviorRow): Behavior => ({
   rule: { kind: 'interval', everyMs: r.every_ms },
   intensity: 'card',
   enabled: r.enabled !== 0,
-  ...(r.countdown_ms ? { countdownMs: r.countdown_ms } : {}),
+  // 범위(0~600) 정리는 normalizeBehaviors 가 한다. v4 이전 행은 마이그레이션이 채웠다
+  durationSec: r.duration_sec,
   isBuiltin: r.is_builtin !== 0,
   // 범위 밖 값 정리는 normalizeBehaviors 가 한다 (v3 이전 행은 DEFAULT 로 'user')
   source: r.source === 'ai' ? 'ai' : 'user',
@@ -201,7 +198,7 @@ function upsertBehavior(behavior: Behavior, verb: 'INSERT OR IGNORE' | 'INSERT O
   return db().then((conn) =>
     conn.execute(
       `${verb} INTO behaviors
-         (id, label, emoji, message, every_ms, countdown_ms, enabled, is_builtin, source, sort_order)
+         (id, label, emoji, message, every_ms, duration_sec, enabled, is_builtin, source, sort_order)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         behavior.id,
@@ -209,7 +206,7 @@ function upsertBehavior(behavior: Behavior, verb: 'INSERT OR IGNORE' | 'INSERT O
         behavior.emoji,
         behavior.message,
         intervalMinutes(behavior) * 60_000,
-        behavior.countdownMs ?? null,
+        behavior.durationSec,
         behavior.enabled ? 1 : 0,
         behavior.isBuiltin ? 1 : 0,
         behavior.source,
@@ -224,7 +221,7 @@ export async function loadBehaviors(): Promise<Behavior[]> {
   await seedBehaviorsIfEmpty()
   const conn = await db()
   const rows = await conn.select<BehaviorRow[]>(
-    `SELECT id, label, emoji, message, every_ms, countdown_ms, enabled, is_builtin, source, sort_order
+    `SELECT id, label, emoji, message, every_ms, duration_sec, enabled, is_builtin, source, sort_order
        FROM behaviors ORDER BY sort_order, id`
   )
   return normalizeBehaviors(rows.map(toBehavior))
@@ -258,10 +255,9 @@ export async function saveBehaviorsAndBroadcast(draft: Behavior[]): Promise<Beha
 /** 저장된 설정 JSON 을 파싱만 해서 준다. 정규화 전 원본이 필요한 곳(레거시 흡수)용. */
 async function readSettingsJson(): Promise<unknown> {
   const conn = await db()
-  const rows = await conn.select<{ value: string }[]>(
-    'SELECT value FROM settings WHERE key = $1',
-    [SETTINGS_KEY]
-  )
+  const rows = await conn.select<{ value: string }[]>('SELECT value FROM settings WHERE key = $1', [
+    SETTINGS_KEY,
+  ])
   if (rows.length === 0) return null
 
   try {
@@ -333,7 +329,7 @@ export async function summarizeBehaviors(): Promise<string> {
   const behaviors = await loadBehaviors()
   const parts = behaviors.map(
     (b) =>
-      `${b.sortOrder}:${b.id}(${b.emoji}${b.label},${intervalMinutes(b)}m,` +
+      `${b.sortOrder}:${b.id}(${b.emoji}${b.label},${intervalMinutes(b)}m,${b.durationSec}s,` +
       `${b.enabled ? 'on' : 'off'}${b.isBuiltin ? ',builtin' : ''}` +
       `${b.source === 'ai' ? ',ai' : ''})`
   )
