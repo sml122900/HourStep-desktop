@@ -5,9 +5,9 @@
 > 배경·규칙은 `CLAUDE.md`, 상세 기록은 `docs/daily/`·`docs/decisions/`.
 
 **마지막 갱신: 2026-08-09** · **현재 Phase: D2.8 완료(자동 검증까지) → 다음 D3**
-**버전 0.3.0** — 설치본(`.exe`/`.msi`) 빌드 완료, **아직 설치하지 않았다**.
-도그푸딩 기기에 깔려 있는 것은 여전히 **0.2.1(D2.6 빌드)** (`%LOCALAPPDATA%\HourStep`, NSIS per-user).
-갱신하려면 `src-tauri\target\release\bundle\nsis\HourStep_0.3.0_x64-setup.exe` 실행.
+**설치본: 0.3.0** (`%LOCALAPPDATA%\HourStep`, NSIS per-user) — 2026-08-09 22:59 설치 완료.
+D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 가 기존 DB 에 적용됐고
+행동·기록·설정은 그대로다. 설치 직전 DB 사본: `…/scratchpad/db-backup-pre-0.3.0-install/`.
 ⚠️ dev 와 설치본이 **같은 DB**(`%APPDATA%\com.hourstep.desktop\hourstep.db`)를 쓴다 —
 `--debug-cmd` 검증은 사용자 데이터를 바꾼다. 실제로 설정을 날린 적이 있다:
 `docs/troubleshooting/dev-and-installed-share-db.md`
@@ -105,7 +105,8 @@
   ② 주 버튼이 그러데이션 → 단색으로 바뀐 게 어색하지 않은가
   ③ 본문 15 / 안내 13 / 라벨 12px 3단이 좁게 느껴지지 않는가
 
-- **D2.7 소리를 실제로 들어봐야 한다.** 자동 검증은 `sound start/end … state=running` 까지만
+- **D2.7 소리를 실제로 들어봐야 한다.** (0.3.0 설치로 이제 도그푸딩 중에 확인할 수 있다.)
+  자동 검증은 `sound start/end … state=running` 까지만
   확인한다(웹뷰가 오디오를 재우지 않았다는 증거). 남은 확인: ① 스피커로 실제로 나는가
   ② ①과 ②가 귀로 구분되는가 ③ 기본 볼륨 60 이 적당한가 ④ 다른 소리(음악·통화) 위에서
   거슬리지 않는가
@@ -116,10 +117,11 @@
   (`…/scratchpad/db-backup-pre-d2.7` 16:02 시점, `…/db-backup-pre-d2.8` 17:0x 시점).
   D2.8 검증은 행동·설정을 건드린 뒤 **전부 원래 값으로 되돌렸고 덤프로 대조했다**
   (스트레칭 30분/60초, 테마 system, 볼륨 60)
-- **설치본이 아직 0.2.1(D2.6 빌드)이다.** 0.3.0 설치 파일은 만들어 뒀지만 **설치는 안 했다** —
-  D2.7·D2.8 을 도그푸딩하려면 `HourStep_0.3.0_x64-setup.exe` 를 실행해야 한다.
-  설치 후 마이그레이션 v4 가 기존 DB 에 적용된다(행위 시간 열 추가). 되돌릴 계획이면
-  `%APPDATA%\com.hourstep.desktop` 를 먼저 복사해 둘 것
+- **0.2.1 로 지내는 동안 `settings` 행이 D2.6 모양으로 덮어써졌다.** 그 빌드에는 알림음
+  설정이 없어서 `soundEnabled`/`soundVolume` 이 JSON 에서 빠졌다. 0.3.0 에서
+  `normalizeSettings()` 가 기본값(on / 60)으로 채우므로 실사용에는 영향이 없다 —
+  0.2.1 에는 볼륨을 바꿀 UI 자체가 없었으니 잃은 값도 없다. **구버전을 다시 띄우면
+  같은 일이 반복된다**는 것만 알아둘 것 (dev 와 설치본이 같은 DB 를 쓴다)
 - **물마시기 간격이 원래 쓰던 값인지 확인 필요.** 2026-08-09 조사 중 `behavior-restore` 로
   사용자 편집을 덮었다. 스트레칭·눈휴식 30분과 순서는 로그로 복구했지만 물마시기만
   근거가 없어 시드값 30분을 넣어뒀다 (경위: `docs/troubleshooting/dev-and-installed-share-db.md`)
