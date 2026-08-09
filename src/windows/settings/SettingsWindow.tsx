@@ -18,10 +18,12 @@ import {
   restoreBuiltins,
 } from '../../core/behaviors'
 import {
+  DEFAULT_SETTINGS,
   MAX_IDLE_REMINDER_MINUTES,
   MAX_SOUND_VOLUME,
   MIN_IDLE_REMINDER_MINUTES,
   MIN_SOUND_VOLUME,
+  clampIdleReminderMinutes,
   type AppSettings,
 } from '../../core/settings'
 import { routineItemsToBehaviors, type RoutineItem } from '../../core/routineParse'
@@ -29,8 +31,13 @@ import { THEME_PREFERENCES, type ThemePreference } from '../../core/theme'
 import type { Behavior } from '../../core/types'
 import * as db from '../../data/db'
 import { AI, SETTINGS } from '../../constants/strings'
+import Button from '../../components/Button'
+import Card from '../../components/Card'
+import Checkbox from '../../components/Checkbox'
+import EmptyState from '../../components/EmptyState'
+import NumberField from '../../components/NumberField'
+import Section from '../../components/Section'
 import { playCue } from '../sound'
-import NumberInput from './NumberInput'
 import RoutineFinder from './RoutineFinder'
 
 const MIN = 60_000
@@ -195,33 +202,30 @@ export default function SettingsWindow() {
     <main className="settings">
       <h1>{SETTINGS.TITLE}</h1>
 
-      <section>
-        <h2>{SETTINGS.BEHAVIORS_TITLE}</h2>
-
+      <Section title={SETTINGS.BEHAVIORS_TITLE}>
         {behaviors === null ? (
-          <p className="hint">…</p>
+          <EmptyState>…</EmptyState>
         ) : behaviors.length === 0 ? (
-          <p className="hint">{SETTINGS.BEHAVIOR_EMPTY}</p>
+          <EmptyState>{SETTINGS.BEHAVIOR_EMPTY}</EmptyState>
         ) : (
           <ul className="behaviors">
             {behaviors.map((behavior, index) => (
-              <li key={behavior.id} className="behavior">
+              <Card key={behavior.id} as="li" variant="row" className="behavior">
                 <div className="behavior__row">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={behavior.enabled}
-                    aria-label={behavior.label}
-                    onChange={(e) =>
+                    ariaLabel={behavior.label}
+                    onChange={(checked) =>
                       void persistBehaviors(
                         behaviors.map((b) =>
-                          b.id === behavior.id ? { ...b, enabled: e.target.checked } : b
+                          b.id === behavior.id ? { ...b, enabled: checked } : b
                         )
                       )
                     }
                   />
 
                   <input
-                    className="behavior__emoji"
+                    className="field behavior__emoji"
                     value={behavior.emoji}
                     maxLength={EMOJI_MAXLENGTH}
                     aria-label="이모지"
@@ -230,7 +234,7 @@ export default function SettingsWindow() {
                   />
 
                   <input
-                    className="behavior__label"
+                    className="field behavior__label"
                     value={behavior.label}
                     maxLength={MAX_LABEL_LENGTH}
                     placeholder={SETTINGS.BEHAVIOR_NAME_PLACEHOLDER}
@@ -245,7 +249,7 @@ export default function SettingsWindow() {
                   {behavior.source === 'ai' && <span className="tag tag--ai">{AI.SOURCE_TAG}</span>}
 
                   <span className="behavior__interval">
-                    <NumberInput
+                    <NumberField
                       value={intervalMinutes(behavior)}
                       min={MIN_INTERVAL_MINUTES}
                       max={MAX_INTERVAL_MINUTES}
@@ -267,7 +271,10 @@ export default function SettingsWindow() {
                   </span>
 
                   <span className="behavior__order">
-                    <button
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon
                       title={SETTINGS.BEHAVIOR_UP}
                       disabled={index === 0}
                       onClick={() =>
@@ -275,29 +282,34 @@ export default function SettingsWindow() {
                       }
                     >
                       ↑
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon
                       title={SETTINGS.BEHAVIOR_DOWN}
                       disabled={index === behaviors.length - 1}
                       onClick={() => void persistBehaviors(moveBehavior(behaviors, behavior.id, 1))}
                     >
                       ↓
-                    </button>
+                    </Button>
                   </span>
 
-                  <button
-                    className="behavior__delete"
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon
                     title={SETTINGS.BEHAVIOR_DELETE}
                     onClick={() =>
                       void persistBehaviors(behaviors.filter((b) => b.id !== behavior.id))
                     }
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
 
                 <input
-                  className="behavior__message"
+                  className="field behavior__message"
                   value={behavior.message}
                   maxLength={MAX_MESSAGE_LENGTH}
                   placeholder={SETTINGS.BEHAVIOR_MESSAGE_PLACEHOLDER}
@@ -310,7 +322,7 @@ export default function SettingsWindow() {
                 <span className="behavior__duration">
                   <label>
                     {SETTINGS.DURATION_LABEL}
-                    <NumberInput
+                    <NumberField
                       value={behavior.durationSec}
                       min={MIN_DURATION_SEC}
                       max={MAX_DURATION_SEC}
@@ -328,14 +340,14 @@ export default function SettingsWindow() {
                       : SETTINGS.DURATION_HINT.replace('{n}', String(behavior.durationSec))}
                   </em>
                 </span>
-              </li>
+              </Card>
             ))}
           </ul>
         )}
 
         <div className="row">
-          <button
-            className="chip"
+          <Button
+            size="sm"
             disabled={behaviors === null || atLimit}
             onClick={() =>
               behaviors &&
@@ -344,14 +356,14 @@ export default function SettingsWindow() {
             }
           >
             {SETTINGS.BEHAVIOR_ADD}
-          </button>
-          <button
-            className="chip"
+          </Button>
+          <Button
+            size="sm"
             disabled={behaviors === null}
             onClick={() => behaviors && void persistBehaviors(restoreBuiltins(behaviors))}
           >
             {SETTINGS.BEHAVIOR_RESTORE}
-          </button>
+          </Button>
         </div>
 
         <p className="hint">
@@ -360,42 +372,36 @@ export default function SettingsWindow() {
             : SETTINGS.BEHAVIORS_HINT}
         </p>
         <p className="hint">{SETTINGS.BEHAVIOR_RESTORE_HINT}</p>
-      </section>
+      </Section>
 
       <RoutineFinder
         remaining={Math.max(0, MAX_BEHAVIORS - (behaviors?.length ?? MAX_BEHAVIORS))}
         onInsert={insertRoutine}
       />
 
-      <section>
-        <h2>{SETTINGS.THEME_TITLE}</h2>
+      <Section title={SETTINGS.THEME_TITLE}>
         <div className="segmented">
           {THEME_PREFERENCES.map((pref) => (
-            <button
+            <Button
               key={pref}
-              className={settings?.theme === pref ? 'is-on' : undefined}
+              size="sm"
+              variant={settings?.theme === pref ? 'primary' : 'ghost'}
               disabled={settings === null}
               onClick={() => settings && void persist({ ...settings, theme: pref })}
             >
               {THEME_LABEL[pref]}
-            </button>
+            </Button>
           ))}
         </div>
-      </section>
+      </Section>
 
-      <section>
-        <h2>{SETTINGS.SOUND_TITLE}</h2>
-        <label className="row">
-          <input
-            type="checkbox"
-            checked={settings?.soundEnabled ?? false}
-            disabled={settings === null}
-            onChange={(e) =>
-              settings && void persist({ ...settings, soundEnabled: e.target.checked })
-            }
-          />
-          <span>{SETTINGS.SOUND_LABEL}</span>
-        </label>
+      <Section title={SETTINGS.SOUND_TITLE}>
+        <Checkbox
+          checked={settings?.soundEnabled ?? false}
+          disabled={settings === null}
+          label={SETTINGS.SOUND_LABEL}
+          onChange={(checked) => settings && void persist({ ...settings, soundEnabled: checked })}
+        />
 
         <div className="row">
           <span className="sound__label">{SETTINGS.SOUND_VOLUME}</span>
@@ -422,60 +428,61 @@ export default function SettingsWindow() {
           <span className="sound__value">{settings?.soundVolume ?? 0}</span>
 
           {/* 소리는 눌러보기 전엔 알 수 없다. 볼륨을 맞추려면 들어봐야 한다 */}
-          <button
-            className="chip"
+          <Button
+            size="sm"
             disabled={settings === null || !settings.soundEnabled}
             onClick={() => settings && playCue('start', settings)}
           >
             {SETTINGS.SOUND_PREVIEW}
-          </button>
+          </Button>
         </div>
 
         <p className="hint">{SETTINGS.SOUND_HINT}</p>
-      </section>
+      </Section>
 
-      <section>
-        <h2>{SETTINGS.IDLE_TITLE}</h2>
+      <Section title={SETTINGS.IDLE_TITLE}>
         <div className="row row--split">
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={settings?.idleReminderEnabled ?? false}
-              disabled={settings === null}
-              onChange={(e) =>
-                settings && void persist({ ...settings, idleReminderEnabled: e.target.checked })
-              }
-            />
-            <span>{SETTINGS.IDLE_LABEL}</span>
-          </label>
+          <Checkbox
+            checked={settings?.idleReminderEnabled ?? false}
+            disabled={settings === null}
+            label={SETTINGS.IDLE_LABEL}
+            onChange={(checked) =>
+              settings && void persist({ ...settings, idleReminderEnabled: checked })
+            }
+          />
 
+          {/*
+            행동의 간격칸과 **같은 컴포넌트**를 쓴다. D2.8 이전에는 여기만 생 input 이라
+            마지막 글자를 지우는 순간 `Number('')=0` 이 저장되고 정규화가 기본값(30분)으로
+            되돌려 버렸다 — 간격칸에서 이미 고친 버그가 여기 남아 있었다.
+          */}
           <span className="behavior__interval">
-            <input
-              type="number"
+            <NumberField
+              value={settings?.idleReminderMinutes ?? DEFAULT_SETTINGS.idleReminderMinutes}
               min={MIN_IDLE_REMINDER_MINUTES}
               max={MAX_IDLE_REMINDER_MINUTES}
-              value={settings?.idleReminderMinutes ?? 30}
+              clamp={clampIdleReminderMinutes}
               disabled={settings === null || !settings.idleReminderEnabled}
-              onChange={(e) =>
-                settings &&
-                void persist({ ...settings, idleReminderMinutes: Number(e.target.value) })
+              ariaLabel={`${SETTINGS.IDLE_LABEL} (${SETTINGS.IDLE_SUFFIX})`}
+              onChange={(minutes) =>
+                settings && setSettings({ ...settings, idleReminderMinutes: minutes })
+              }
+              onCommit={(minutes) =>
+                settings && void persist({ ...settings, idleReminderMinutes: minutes })
               }
             />
             {SETTINGS.IDLE_SUFFIX}
           </span>
         </div>
-      </section>
+      </Section>
 
-      <section>
-        <label className="row">
-          <input
-            type="checkbox"
-            checked={autostart === true}
-            disabled={autostart === null}
-            onChange={(e) => void toggleAutostart(e.target.checked)}
-          />
-          <span>{SETTINGS.AUTOSTART_LABEL}</span>
-        </label>
+      <section className="section">
+        <Checkbox
+          checked={autostart === true}
+          disabled={autostart === null}
+          label={SETTINGS.AUTOSTART_LABEL}
+          onChange={(checked) => void toggleAutostart(checked)}
+        />
         <p className="hint">{SETTINGS.AUTOSTART_HINT}</p>
       </section>
 

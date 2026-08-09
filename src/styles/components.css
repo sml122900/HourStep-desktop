@@ -1,0 +1,218 @@
+/*
+ * 공통 컴포넌트 스타일 — `src/components/` 의 TSX 와 1:1로 붙어 있다.
+ * 세 창이 전부 이 파일을 읽으므로(base.css 가 import) **오버레이 카드 위에서도 성립해야 한다**:
+ * 그래서 버튼·행 배경은 불투명 색이 아니라 반투명 토큰(--bg-sunken / --bg-hover)을 쓴다.
+ *
+ * 창 하나에서만 쓰는 것은 여기 두지 않는다. 창별 CSS 로 간다.
+ */
+
+/* ───────────────────────────  Button  ─────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.btn--sm {
+  height: 28px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.btn--md {
+  height: 34px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-md);
+}
+
+/* 아이콘 한 글자짜리(↑ ↓ ✕). 정사각형이라 라벨 버튼과 나란히 서도 폭이 튀지 않는다 */
+.btn--icon {
+  padding: 0;
+}
+
+.btn--icon.btn--sm {
+  width: 28px;
+}
+
+.btn--icon.btn--md {
+  width: 34px;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: var(--fw-bold);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn--secondary {
+  background: var(--bg-sunken);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--danger);
+}
+
+/* 비활성은 투명도 하나로만 구분한다 — 변형마다 따로 색을 잡으면 네 벌이 어긋난다 */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* ─────────────────────────  입력칸 (field)  ───────────────────────── */
+
+.field {
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--field-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+
+.field:disabled {
+  opacity: 0.45;
+}
+
+/* 숫자칸(간격·행위 시간). 자릿수가 바뀌어도 폭이 흔들리지 않게 */
+.field--number {
+  width: 64px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ───────────────────────────  Checkbox  ─────────────────────────── */
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+
+.check__box {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.check__box:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ─────────────────────────────  Card  ───────────────────────────── */
+
+.card {
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+/* 목록 한 줄(설정의 행동 행, AI 미리보기 줄). 패널보다 얕고 좁다 */
+.card--row {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+}
+
+/* ────────────────────────────  Section  ─────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.section__title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* ──────────────────  텍스트 유틸 (EmptyState / hint / error)  ────────────────── */
+
+/* 보여줄 게 없을 때. 자리를 비워 두지 않고 왜 비었는지 한 줄로 말한다 */
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.hint {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--danger);
+}
+
+/* 한 줄에 늘어놓는 컨트롤 묶음 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.row--wrap {
+  flex-wrap: wrap;
+}
+
+.row--split {
+  justify-content: space-between;
+  gap: var(--sp-4);
+}

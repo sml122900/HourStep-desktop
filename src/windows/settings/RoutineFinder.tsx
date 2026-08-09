@@ -19,7 +19,11 @@ import {
   type RoutineParseResult,
 } from '../../core/routineParse'
 import { AI } from '../../constants/strings'
-import NumberInput from './NumberInput'
+import Button from '../../components/Button'
+import Card from '../../components/Card'
+import Checkbox from '../../components/Checkbox'
+import NumberField from '../../components/NumberField'
+import Section from '../../components/Section'
 
 /** 이모지 입력 상한. maxLength 는 UTF-16 단위라 코드포인트의 2배로 잡는다 (설정 창과 동일) */
 const EMOJI_MAXLENGTH = MAX_EMOJI_CODEPOINTS * 2
@@ -185,14 +189,12 @@ export default function RoutineFinder({
   const overflow = selected.length > remaining
 
   return (
-    <section ref={sectionRef}>
-      <h2>{AI.TITLE}</h2>
-
+    <Section title={AI.TITLE} ref={sectionRef}>
       {!open ? (
         <div className="row">
-          <button className="chip" onClick={() => setOpen(true)}>
+          <Button size="sm" onClick={() => setOpen(true)}>
             {AI.OPEN}
-          </button>
+          </Button>
         </div>
       ) : (
         <>
@@ -202,6 +204,7 @@ export default function RoutineFinder({
             <label className="ai__field">
               <span>{AI.JOB_LABEL}</span>
               <input
+                className="field"
                 value={job}
                 placeholder={AI.JOB_PLACEHOLDER}
                 onChange={(e) => setJob(e.target.value)}
@@ -210,6 +213,7 @@ export default function RoutineFinder({
             <label className="ai__field">
               <span>{AI.SYMPTOM_LABEL}</span>
               <input
+                className="field"
                 value={symptom}
                 placeholder={AI.SYMPTOM_PLACEHOLDER}
                 onChange={(e) => setSymptom(e.target.value)}
@@ -224,12 +228,12 @@ export default function RoutineFinder({
           </div>
 
           <div className="row">
-            <button className="chip" onClick={() => void copyPrompt()}>
+            <Button size="sm" onClick={() => void copyPrompt()}>
               {AI.PROMPT_COPY}
-            </button>
-            <button className="chip" onClick={() => setOpen(false)}>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               {AI.CLOSE}
-            </button>
+            </Button>
           </div>
 
           {/* ② 어디로 갈지는 사용자가 고른다. 주소는 core/aiQuery.ts 의 AI_TARGETS 한 곳에만. */}
@@ -237,12 +241,12 @@ export default function RoutineFinder({
             <span>{AI.TARGETS_LABEL}</span>
             <div className="row row--wrap">
               {AI_TARGETS.map((target) => (
-                <button key={target.id} className="chip" onClick={() => void openTarget(target)}>
+                <Button key={target.id} size="sm" onClick={() => void openTarget(target)}>
                   {(target.injectsPrompt ? AI.TARGET_OPEN : AI.TARGET_OPEN_PASTE).replace(
                     '{name}',
                     target.name
                   )}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -252,7 +256,7 @@ export default function RoutineFinder({
           <label className="ai__field">
             <span>{AI.PASTE_LABEL}</span>
             <textarea
-              className="ai__paste"
+              className="field ai__paste"
               rows={5}
               value={pasted}
               placeholder={AI.PASTE_PLACEHOLDER}
@@ -261,38 +265,37 @@ export default function RoutineFinder({
           </label>
 
           <div className="row">
-            <button className="chip" disabled={!pasted.trim()} onClick={analyze}>
+            <Button size="sm" disabled={!pasted.trim()} onClick={analyze}>
               {AI.ANALYZE}
-            </button>
-            <button className="chip" onClick={() => setRows((prev) => prev ?? [blankRow()])}>
+            </Button>
+            <Button size="sm" onClick={() => setRows((prev) => prev ?? [blankRow()])}>
               {AI.MANUAL}
-            </button>
+            </Button>
           </div>
 
           {notice && <p className="hint">{notice}</p>}
 
           {rows && (
             <>
-              <h2>{AI.PREVIEW_TITLE}</h2>
+              <h2 className="section__title">{AI.PREVIEW_TITLE}</h2>
               <ul className="behaviors">
                 {rows.map((row, index) => (
-                  <li key={index} className="behavior">
+                  <Card key={index} as="li" variant="row" className="behavior">
                     <div className="behavior__row">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={row.checked}
-                        aria-label={row.label || AI.PREVIEW_TITLE}
-                        onChange={(e) => editRow(index, { checked: e.target.checked })}
+                        ariaLabel={row.label || AI.PREVIEW_TITLE}
+                        onChange={(checked) => editRow(index, { checked })}
                       />
                       <input
-                        className="behavior__emoji"
+                        className="field behavior__emoji"
                         value={row.emoji}
                         maxLength={EMOJI_MAXLENGTH}
                         aria-label="이모지"
                         onChange={(e) => editRow(index, { emoji: e.target.value })}
                       />
                       <input
-                        className="behavior__label"
+                        className="field behavior__label"
                         value={row.label}
                         maxLength={MAX_LABEL_LENGTH}
                         placeholder="이름"
@@ -300,7 +303,7 @@ export default function RoutineFinder({
                       />
                       <span className="behavior__interval">
                         {/* 미리보기 줄도 설정 목록과 같은 입력칸을 쓴다 (지우는 중 0 으로 튀지 않게) */}
-                        <NumberInput
+                        <NumberField
                           value={row.minutes}
                           min={MIN_INTERVAL_MINUTES}
                           max={MAX_INTERVAL_MINUTES}
@@ -311,30 +314,32 @@ export default function RoutineFinder({
                         />
                         분마다
                       </span>
-                      <button
-                        className="behavior__delete"
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        icon
                         title={AI.CANCEL}
                         onClick={() => setRows(rows.filter((_, i) => i !== index))}
                       >
                         ✕
-                      </button>
+                      </Button>
                     </div>
 
                     <input
-                      className="behavior__message"
+                      className="field behavior__message"
                       value={row.message}
                       maxLength={MAX_MESSAGE_LENGTH}
                       placeholder="알림 문구"
                       onChange={(e) => editRow(index, { message: e.target.value })}
                     />
-                  </li>
+                  </Card>
                 ))}
               </ul>
 
               <div className="row">
-                <button className="chip" onClick={() => setRows([...rows, blankRow()])}>
+                <Button size="sm" onClick={() => setRows([...rows, blankRow()])}>
                   {AI.ROW_ADD}
-                </button>
+                </Button>
               </div>
 
               {/* 규칙 6 — AI 가 준 문구를 그대로 저장한다. 효용을 단정하지 않는다는 고지는 고정. */}
@@ -342,8 +347,9 @@ export default function RoutineFinder({
               {overflow && <p className="error">{AI.LIMIT.replace('{n}', String(remaining))}</p>}
 
               <div className="row">
-                <button
-                  className="chip chip--primary"
+                <Button
+                  size="sm"
+                  variant="primary"
                   disabled={selected.length === 0 || overflow}
                   onClick={() => {
                     onInsert(selected.map(({ checked: _checked, ...item }) => item))
@@ -353,10 +359,10 @@ export default function RoutineFinder({
                   {selected.length === 0
                     ? AI.INSERT_NONE
                     : AI.INSERT.replace('{n}', String(selected.length))}
-                </button>
-                <button className="chip" onClick={reset}>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={reset}>
                   {AI.CANCEL}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -367,6 +373,6 @@ export default function RoutineFinder({
 
       {/* 복사는 화면에 아무 흔적도 남기지 않는 동작이라 피드백이 없으면 눌렸는지 알 수 없다 */}
       {toast && <div className="toast">{toast}</div>}
-    </section>
+    </Section>
   )
 }

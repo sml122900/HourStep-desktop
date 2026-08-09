@@ -85,6 +85,19 @@ export function clampDurationSeconds(value: unknown): number {
   return rounded
 }
 
+/**
+ * 숫자칸에 들어온 문자열에서 숫자만 남긴다. **값을 확정하지 않는다** —
+ * 빈 문자열을 빈 문자열로 돌려주는 게 핵심이다. 지우는 중인 칸을 `Number('')=0` 으로
+ * 확정해 버리면 마지막 글자를 지우는 순간 값이 0 으로 튀고, 저장 시 정규화가 범위 밖으로
+ * 판단해 시드로 되돌려 버린다 (D2.6 후속에서 실제로 났던 버그).
+ *
+ * 선행 0 은 지운다 — `030` 을 그대로 두면 화면에 남고 저장값(30)과 눈에 보이는 값이 갈린다.
+ * 최종 확정은 blur 에서 `clampIntervalMinutes` / `clampDurationSeconds` 가 한다.
+ */
+export function sanitizeDigits(raw: string): string {
+  return raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+}
+
 /** interval 행동의 간격(분). atElapsed 면 0 */
 export function intervalMinutes(behavior: Behavior): number {
   return behavior.rule.kind === 'interval' ? Math.round(behavior.rule.everyMs / MIN) : 0

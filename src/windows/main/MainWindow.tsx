@@ -13,6 +13,9 @@ import {
   todayRange,
 } from '../../data/range'
 import { MAIN } from '../../constants/strings'
+import Button from '../../components/Button'
+import Card from '../../components/Card'
+import EmptyState from '../../components/EmptyState'
 
 /**
  * DB 를 다시 읽는 주기. 통계 **표시**는 매 tick 다시 계산하지만(순수 함수라 공짜),
@@ -175,9 +178,9 @@ export default function MainWindow() {
           <span className="badge">{MAIN.PHASE_BADGE}</span>
           <h1>{MAIN.TITLE}</h1>
         </div>
-        <button className="ghost" onClick={() => invoke('open_settings_window')}>
+        <Button size="sm" onClick={() => invoke('open_settings_window')}>
           {MAIN.OPEN_SETTINGS_BUTTON}
-        </button>
+        </Button>
       </header>
 
       <SessionPanel
@@ -189,9 +192,9 @@ export default function MainWindow() {
       />
 
       {view === null ? (
-        <p className="desc">…</p>
+        <EmptyState>…</EmptyState>
       ) : empty ? (
-        <p className="desc">{MAIN.STATS_EMPTY}</p>
+        <EmptyState>{MAIN.STATS_EMPTY}</EmptyState>
       ) : (
         <div className="stats">
           <StatsPanel
@@ -205,8 +208,8 @@ export default function MainWindow() {
       )}
 
       <div className="actions">
-        <button onClick={() => invoke('trigger_test_overlay')}>{MAIN.TEST_OVERLAY_BUTTON}</button>
-        <button onClick={() => invoke('hide_main_window')}>{MAIN.HIDE_BUTTON}</button>
+        <Button onClick={() => invoke('trigger_test_overlay')}>{MAIN.TEST_OVERLAY_BUTTON}</Button>
+        <Button onClick={() => invoke('hide_main_window')}>{MAIN.HIDE_BUTTON}</Button>
       </div>
 
       <p className="hint">{MAIN.DESCRIPTION}</p>
@@ -232,7 +235,7 @@ function SessionPanel({
   const nextBehavior = next && behaviors.find((b) => b.id === next.behaviorId)
 
   return (
-    <section className="session">
+    <Card as="section" className="session">
       <div className="session__head">
         <div>
           <span className="session__state">
@@ -244,12 +247,12 @@ function SessionPanel({
         </div>
 
         {/* 트레이 메뉴와 완전히 같은 커맨드. 어느 쪽에서 눌러도 session://changed 로 합쳐진다 */}
-        <button
-          className={`session__toggle${active ? ' session__toggle--end' : ''}`}
+        <Button
+          variant={active ? 'secondary' : 'primary'}
           onClick={() => invoke(active ? 'end_session_command' : 'start_session_command')}
         >
           {active ? MAIN.SESSION_END : MAIN.SESSION_START}
-        </button>
+        </Button>
       </div>
 
       {!active ? (
@@ -286,7 +289,7 @@ function SessionPanel({
           )}
         </>
       )}
-    </section>
+    </Card>
   )
 }
 
@@ -302,9 +305,9 @@ function StatsPanel({
   active: boolean
 }) {
   return (
-    <section className="panel">
+    <Card as="section" className="panel">
       <header>
-        <h2>{title}</h2>
+        <h2 className="section__title">{title}</h2>
         {active && <span className="live">{MAIN.STATS_ACTIVE}</span>}
       </header>
 
@@ -339,6 +342,6 @@ function StatsPanel({
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   )
 }

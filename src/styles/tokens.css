@@ -1,0 +1,159 @@
+/*
+ * 디자인 토큰 — 색·간격·반경·그림자·타이포·모션의 **단일 출처**.
+ * 규격과 사용 규칙은 docs/design-system.md.
+ *
+ * 여기 밖에서는 색 리터럴(#/rgb/hsl)과 임의 px 여백을 쓰지 않는다.
+ * 새 값이 필요하면 먼저 이 파일에 토큰으로 정의하고 그 이름을 참조한다.
+ * (`src/styles/tokens.test.ts` 가 잔존 여부를 자동으로 잡는다.)
+ *
+ * 다크가 `:root` 기본값인 이유: 창이 만들어진 직후 JS 가 `data-theme` 을 붙이기 전까지의
+ * 한 프레임을 다크로 덮어둔다. 기본값 없이 두면 그 틈에 흰 화면이 번쩍일 수 있다.
+ * 적용은 src/windows/theme.ts, 선택 규칙은 src/core/theme.ts.
+ *
+ * 색 대비는 전부 WCAG AA 본문 기준(4.5:1)으로 잡았다. 계산 근거는 design-system.md 의 표.
+ */
+
+/* ─────────────────────────  다크 (기본)  ───────────────────────── */
+
+:root,
+:root[data-theme='dark'] {
+  /* 표면. sunken/hover 는 **반투명** — 창 배경 위에서도, 오버레이 카드 위에서도 같이 쓴다 */
+  --bg: #12141a;
+  --bg-elevated: #1b1e26;
+  --bg-sunken: rgba(255, 255, 255, 0.04);
+  --bg-hover: rgba(255, 255, 255, 0.09);
+
+  /* 글자 */
+  --text: #e8eaf0;
+  --text-muted: #9aa1b1;
+  --text-subtle: #868ea2;
+
+  /* 선. strong 은 입력칸처럼 경계가 분명해야 하는 자리 */
+  --border: #2b2f3a;
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /*
+   * 강조. `--accent` 는 **채우는 색**이고 그 위에 얹는 글자는 `--accent-fg` 다.
+   * 라이트/다크가 같은 값인 이유 — 흰 글자가 4.5:1 을 넘는 파랑은 좁고, 두 테마가
+   * 서로 다른 파랑을 쓸 이유가 없다. 어두운 배경에서 **글자로** 쓰는 강조색은
+   * `--accent-text` 가 따로 있다.
+   */
+  --accent: #2f6fe0;
+  --accent-hover: #2559c2;
+  --accent-fg: #ffffff;
+  --accent-tint: rgba(79, 140, 255, 0.14);
+  --accent-line: rgba(79, 140, 255, 0.3);
+  --accent-text: #9dbcff;
+
+  /* 상태 */
+  --danger: #ff8080;
+  --success: #4ecb8b;
+  --warn: #e8ae45;
+
+  /* 입력칸 배경. 테두리는 --border-strong 을 쓴다 */
+  --field-bg: rgba(0, 0, 0, 0.25);
+
+  /* 키보드 포커스 링 */
+  --focus: #6ea3ff;
+
+  /*
+   * 오버레이 전용. 카드는 임의의 배경(에디터·브라우저·게임) 위에 뜨므로 대비를
+   * 스스로 확보해야 한다. 창이 카드 실크기라 드롭섀도를 쓸 수 없어서
+   * (docs/decisions/0005) 테두리 + 안쪽 그림자로 가장자리를 만든다.
+   */
+  --overlay-bg: linear-gradient(180deg, rgba(30, 34, 44, 0.96), rgba(20, 23, 30, 0.96));
+  --overlay-border: rgba(255, 255, 255, 0.16);
+  --overlay-edge-top: rgba(255, 255, 255, 0.09);
+  --overlay-edge-bottom: rgba(0, 0, 0, 0.4);
+
+  /* 그림자. **오버레이 창에서는 사용 금지** — 창 밖으로 번지는 부분이 잘린다 */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
+/* ─────────────────────────  라이트  ───────────────────────── */
+
+:root[data-theme='light'] {
+  --bg: #f2f4f8;
+  --bg-elevated: #ffffff;
+  --bg-sunken: rgba(15, 23, 42, 0.04);
+  --bg-hover: rgba(15, 23, 42, 0.08);
+
+  --text: #1a1d25;
+  --text-muted: #5b6376;
+  --text-subtle: #636b7e;
+
+  --border: #dde1ea;
+  --border-strong: #cbd2e0;
+
+  --accent: #2f6fe0;
+  --accent-hover: #2559c2;
+  --accent-fg: #ffffff;
+  --accent-tint: rgba(47, 111, 224, 0.1);
+  --accent-line: rgba(47, 111, 224, 0.28);
+  --accent-text: #2258bd;
+
+  --danger: #c02626;
+  --success: #15794a;
+  --warn: #8a5a00;
+
+  --field-bg: #ffffff;
+
+  --focus: #2f6fe0;
+
+  /* 라이트에서는 밝은 배경(문서·에디터) 위에 뜨면 묻힌다 — 테두리를 다크보다 진하게 */
+  --overlay-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(244, 246, 251, 0.985));
+  --overlay-border: rgba(15, 23, 42, 0.26);
+  --overlay-edge-top: rgba(255, 255, 255, 0.9);
+  --overlay-edge-bottom: rgba(15, 23, 42, 0.1);
+
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-2: 0 6px 20px rgba(15, 23, 42, 0.16);
+
+  color-scheme: light;
+}
+
+/* ───────────────  테마와 무관한 것 (한 벌만 정의한다)  ─────────────── */
+
+:root {
+  /* 간격 — 4px 배수 고정. padding·margin·gap 은 여기서만 고른다 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* 반경 */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+
+  /* 타이포 — 글자는 이 4단만 쓴다 */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 20px;
+
+  /*
+   * 스케일 밖 — 글자가 아닌 두 가지. design-system.md 에 사용처를 못 박아 두었다.
+   * display: 곁눈질로 읽는 숫자(경과시간·카운트다운) / icon: 카드의 이모지 글리프
+   */
+  --fs-display: 30px;
+  --fs-icon: 24px;
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 600;
+
+  --lh-base: 1.5;
+  --lh-tight: 1.2;
+
+  /* 모션 */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}

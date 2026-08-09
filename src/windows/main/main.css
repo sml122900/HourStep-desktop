@@ -1,3 +1,7 @@
+/*
+ * 메인 창 전용. 공통 것(버튼·카드·섹션·hint)은 src/styles/components.css 에 있다.
+ * 색 리터럴과 임의 px 여백은 여기 두지 않는다 — 전부 tokens.css 의 토큰을 참조한다.
+ */
 body {
   background: var(--bg);
   color: var(--text);
@@ -5,10 +9,10 @@ body {
 
 .shell {
   height: 100%;
-  padding: 22px 28px 20px;
+  padding: var(--sp-6);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-4);
   overflow-y: auto;
 }
 
@@ -18,141 +22,95 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sp-4);
 }
 
 .badge {
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--accent-tint);
   border: 1px solid var(--accent-line);
   color: var(--accent-text);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.01em;
 }
 
 h1 {
-  margin: 4px 0 0;
-  font-size: 23px;
-  font-weight: 650;
-}
-
-.ghost {
-  flex: 0 0 auto;
-  padding: 8px 14px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  transition: background 120ms ease;
-}
-
-.ghost:hover {
-  background: var(--surface-hover);
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
 }
 
 /* ─── 세션 + 타이머 ─── */
 
 .session {
-  padding: 16px 18px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .session__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sp-4);
 }
 
 .session__state {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.02em;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .session__elapsed {
   display: block;
-  margin-top: 2px;
-  font-size: 34px;
-  font-weight: 650;
-  line-height: 1.1;
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
   /* 자릿수가 바뀌어도 폭이 흔들리지 않게 — 매초 갱신되는 값이라 특히 중요하다 */
   font-variant-numeric: tabular-nums;
-}
-
-.session__toggle {
-  flex: 0 0 auto;
-  padding: 11px 20px;
-  border-radius: 10px;
-  border: 1px solid var(--accent);
-  background: var(--accent-grad);
-  color: var(--accent-on);
-  font-size: 15px;
-  font-weight: 600;
-  transition: background 120ms ease;
-}
-
-.session__toggle:hover {
-  background: var(--accent-grad-hover);
-}
-
-.session__toggle--end {
-  border-color: var(--border);
-  background: var(--row-bg);
-  color: var(--text);
-}
-
-.session__toggle--end:hover {
-  background: var(--surface-hover);
 }
 
 .next {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--accent-soft);
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--accent-tint);
   border: 1px solid var(--accent-line);
 }
 
 .next__label {
-  font-size: 12px;
-  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .next__name {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
 }
 
 .next__time {
   margin-left: auto;
-  font-size: 18px;
-  font-weight: 650;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
   color: var(--accent-text);
 }
 
 .upcoming {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .upcoming__label {
   flex: 0 0 auto;
-  padding-top: 3px;
-  font-size: 12px;
-  color: var(--text-dim);
+  padding-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .upcoming ul {
@@ -161,15 +119,15 @@ h1 {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 2px;
+  gap: var(--sp-1);
 }
 
 .upcoming li {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text-dim);
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 .upcoming__time {
@@ -181,60 +139,44 @@ h1 {
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--sp-3);
   width: 100%;
-}
-
-.panel {
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
 }
 
 .panel header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.panel h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-dim);
-  text-transform: uppercase;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
 }
 
 .live {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--accent-soft);
+  font-size: var(--fs-xs);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--accent-tint);
   border: 1px solid var(--accent-line);
   color: var(--accent-text);
   white-space: nowrap;
 }
 
 .totals {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sp-3);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .totals dt {
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .totals dd {
-  margin: 2px 0 0;
-  font-size: 17px;
-  font-weight: 650;
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -243,64 +185,40 @@ h1 {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 4px;
+  gap: var(--sp-1);
 }
 
 .behavior-stats li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  padding: 4px 0;
-  border-top: 1px solid var(--hairline);
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  padding: var(--sp-1) 0;
+  border-top: 1px solid var(--border);
 }
 
 .behavior-stats__value {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: var(--fw-bold);
   white-space: nowrap;
 }
 
 .behavior-stats__value em {
-  margin-left: 6px;
+  margin-left: var(--sp-2);
   font-style: normal;
-  font-weight: 400;
-  color: var(--text-dim);
-}
-
-.desc {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--text-dim);
+  font-weight: var(--fw-normal);
+  color: var(--text-muted);
 }
 
 .actions {
   display: flex;
-  gap: 10px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
-.actions button {
-  padding: 9px 16px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  transition: background 120ms ease;
-}
-
-.actions button:hover {
-  background: var(--surface-hover);
-}
-
-.hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-faint);
-}
-
+/* 창을 채우고 남는 자리는 맨 아래 안내 위로 밀어낸다 */
 .shell > .hint:last-child {
   margin-top: auto;
-  padding-top: 4px;
+  padding-top: var(--sp-1);
 }

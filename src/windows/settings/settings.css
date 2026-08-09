@@ -1,3 +1,7 @@
+/*
+ * 설정 창 전용. 버튼·입력칸·체크박스·카드·섹션·hint 는 src/styles/components.css 에 있다.
+ * 색 리터럴과 임의 px 여백은 여기 두지 않는다 — 전부 tokens.css 의 토큰을 참조한다.
+ */
 body {
   background: var(--bg);
   color: var(--text);
@@ -5,52 +9,17 @@ body {
 
 .settings {
   height: 100%;
-  padding: 24px 26px;
+  padding: var(--sp-6);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--sp-6);
   overflow-y: auto;
 }
 
 .settings h1 {
   margin: 0;
-  font-size: 19px;
-  font-weight: 650;
-}
-
-.settings h2 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-dim);
-  text-transform: uppercase;
-}
-
-.settings section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.row--split {
-  justify-content: space-between;
-  gap: 16px;
-}
-
-input[type='checkbox'] {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--accent);
-  cursor: pointer;
-  flex: 0 0 auto;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
 }
 
 /* ─── 행동 목록 ─── */
@@ -60,46 +29,36 @@ input[type='checkbox'] {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: var(--sp-2);
+  min-width: 0;
 }
 
+/*
+ * `minmax(0, 1fr)` 이 없으면 행이 창 밖으로 나간다. 암묵 트랙의 기본값 `auto` 는
+ * 최대치가 max-content 라서, 안쪽 입력칸들이 각자 요구하는 기본 폭(≈20자)의 합만큼
+ * 트랙이 부풀고 컨테이너보다 커져도 줄지 않는다. 최소를 0 으로 열어 주면 트랙이
+ * 창 폭에 맞고, 남는 자리는 이름칸이 흡수한다(`.behavior__label` 의 flex-grow).
+ */
 .behavior {
   display: grid;
-  gap: 6px;
-  padding: 9px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--row-bg);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+  min-width: 0;
 }
 
 .behavior__row {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.behavior input[type='text'],
-.behavior__emoji,
-.behavior__label,
-.behavior__message,
-.behavior__interval input[type='number'],
-.behavior__duration input[type='number'] {
-  padding: 5px 8px;
-  border-radius: 7px;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
+  gap: var(--sp-2);
 }
 
 .behavior__emoji {
-  width: 46px;
+  width: 48px;
   flex: 0 0 auto;
   text-align: center;
   /* 이모지는 폰트 대체가 필요하다 — 본문 폰트에 없으면 흑백 글리프로 떨어진다 */
   font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 
 .behavior__label {
@@ -111,12 +70,6 @@ input[type='checkbox'] {
   width: 100%;
 }
 
-.behavior__message:disabled,
-.behavior__interval input[type='number']:disabled,
-.behavior__duration input[type='number']:disabled {
-  opacity: 0.45;
-}
-
 /*
  * 행위 시간. 첫 줄(간격 옆)에 두기에는 그 줄이 이미 꽉 차 있어서 문구칸 아래로 내렸다.
  * 값 옆의 안내는 0 과 양수의 차이를 말로 설명한다 — 「0초」가 무슨 뜻인지는 숫자만 봐서는 모른다.
@@ -125,102 +78,60 @@ input[type='checkbox'] {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: 12.5px;
-  color: var(--text-dim);
+  gap: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .behavior__duration label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   white-space: nowrap;
-}
-
-.behavior__duration input[type='number'] {
-  width: 62px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
 }
 
 .behavior__duration em {
   font-style: normal;
-  color: var(--text-faint);
+  color: var(--text-subtle);
+}
+
+.behavior__interval {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.behavior__order {
+  display: flex;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
 }
 
 .tag {
   flex: 0 0 auto;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--accent-soft);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--accent-tint);
   border: 1px solid var(--accent-line);
   color: var(--accent-text);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 /* AI 유래 행동 표시. 「기본」 태그와 나란히 서므로 색만 다르게 준다 */
 .tag--ai {
   background: transparent;
   border-color: var(--border);
-  color: var(--text-dim);
-}
-
-.behavior__interval {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.behavior__interval input[type='number'] {
-  width: 62px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.behavior__order {
-  display: flex;
-  gap: 2px;
-  flex: 0 0 auto;
-}
-
-.behavior__order button,
-.behavior__delete {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 13px;
-  line-height: 1;
-}
-
-.behavior__order button:hover:not(:disabled),
-.behavior__delete:hover {
-  background: var(--btn-hover);
-  color: var(--text);
-}
-
-.behavior__order button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-.behavior__delete:hover {
-  color: var(--danger);
+  color: var(--text-muted);
 }
 
 /* ─── 알림음 ─── */
 
 .sound__label {
-  font-size: 13px;
-  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 .sound__range {
@@ -238,44 +149,37 @@ input[type='checkbox'] {
 /* 값이 30 → 5 로 줄 때 칸이 흔들리지 않게 폭을 고정한다 */
 .sound__value {
   width: 3ch;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
   text-align: right;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 /* ─── AI로 루틴 찾기 ─── */
 
 .ai__inputs {
   display: grid;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .ai__field {
   display: grid;
-  gap: 4px;
+  gap: var(--sp-1);
 }
 
 .ai__field > span {
-  font-size: 12px;
-  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .ai__field input,
 .ai__paste {
   width: 100%;
-  padding: 6px 9px;
-  border-radius: 7px;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
 }
 
 .ai__paste {
   resize: vertical;
-  line-height: 1.45;
+  line-height: var(--lh-base);
   /* 붙여넣은 원문은 그대로 남는다 — 파싱이 실패해도 보고 직접 입력할 수 있어야 한다 */
   min-height: 90px;
 }
@@ -286,111 +190,45 @@ input[type='checkbox'] {
  */
 .ai__prompt {
   margin: 0;
-  padding: 9px 11px;
+  padding: var(--sp-2) var(--sp-3);
   max-height: 190px;
   overflow-y: auto;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--border);
-  background: var(--row-bg);
-  color: var(--text-dim);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
   font: inherit;
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
-}
-
-.row--wrap {
-  flex-wrap: wrap;
 }
 
 /* 복사는 화면에 흔적이 남지 않는 동작이라 눌렸다는 신호가 따로 필요하다 */
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  bottom: var(--sp-6);
   transform: translateX(-50%);
-  padding: 8px 16px;
-  border-radius: 999px;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-full);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--bg-elevated);
   color: var(--text);
-  font-size: 13px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow-2);
   pointer-events: none;
 }
 
-/* ─── 버튼 ─── */
-
-.chip {
-  padding: 7px 14px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  transition: background 120ms ease;
-}
-
-.chip:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-
-.chip:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-/* 미리보기의 [추가] — 되돌릴 수 없는 삽입이라 다른 버튼과 구분해 둔다 */
-.chip--primary {
-  border-color: transparent;
-  background: var(--accent-grad);
-  color: var(--accent-on);
-  font-weight: 600;
-}
-
-.chip--primary:hover:not(:disabled) {
-  background: var(--accent-grad-hover);
-}
+/* ─── 테마 선택 ─── */
 
 .segmented {
   display: inline-flex;
   align-self: flex-start;
-  padding: 2px;
-  border-radius: 10px;
+  padding: var(--sp-1);
+  gap: var(--sp-1);
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
-  background: var(--row-bg);
-}
-
-.segmented button {
-  padding: 6px 16px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
-.segmented button:hover:not(.is-on):not(:disabled) {
-  color: var(--text);
-}
-
-.segmented button.is-on {
-  background: var(--accent-grad);
-  color: var(--accent-on);
-  font-weight: 600;
-}
-
-.hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-faint);
-  max-width: 52ch;
-}
-
-.error {
-  margin: 0;
-  font-size: 13px;
-  color: var(--danger);
+  background: var(--bg-sunken);
 }

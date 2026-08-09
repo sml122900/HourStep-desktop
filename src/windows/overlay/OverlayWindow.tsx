@@ -32,6 +32,7 @@ import type {
 import * as db from '../../data/db'
 import { formatDuration, formatRate } from '../../data/range'
 import { OVERLAY } from '../../constants/strings'
+import Button from '../../components/Button'
 import { playCue } from '../sound'
 
 /** 슬라이드 아웃 CSS transition 시간과 맞춰야 한다 (overlay.css) */
@@ -650,7 +651,11 @@ export default function OverlayWindow() {
     // 창 전체는 투명. 카드 영역 밖은 그리지 않는다.
     <div className="overlay-root">
       {active && (
-        <div ref={cardRef} className={`card${slidIn ? ' card--in' : ''}`} role="alert">
+        <div
+          ref={cardRef}
+          className={`overlay-card${slidIn ? ' overlay-card--in' : ''}`}
+          role="alert"
+        >
           {active.kind === 'behavior' && (
             <BehaviorCard
               behavior={active.behavior}
@@ -663,24 +668,24 @@ export default function OverlayWindow() {
 
           {active.kind === 'idle' && (
             <>
-              <div className="card__body">
-                <span className="card__icon" aria-hidden="true">
+              <div className="overlay-card__body">
+                <span className="overlay-card__icon" aria-hidden="true">
                   {OVERLAY.IDLE_ICON}
                 </span>
-                <p className="card__message">{OVERLAY.IDLE_MESSAGE}</p>
+                <p className="overlay-card__message">{OVERLAY.IDLE_MESSAGE}</p>
               </div>
-              <div className="card__actions">
-                <button
-                  className="btn btn--primary"
+              <div className="overlay-card__actions">
+                <Button
+                  variant="primary"
                   onClick={() => {
                     void invoke('start_session_command')
                   }}
                 >
                   {OVERLAY.IDLE_START}
-                </button>
-                <button className="btn btn--ghost" onClick={hide}>
+                </Button>
+                <Button variant="ghost" onClick={hide}>
                   {OVERLAY.IDLE_LATER}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -711,35 +716,37 @@ function BehaviorCard({
 
   return (
     <>
-      <div className="card__body">
-        <span className="card__icon" aria-hidden="true">
+      <div className="overlay-card__body">
+        <span className="overlay-card__icon" aria-hidden="true">
           {behavior.emoji}
         </span>
-        <p className={`card__message${phase === 'counting' ? ' card__message--count' : ''}`}>
+        <p
+          className={`overlay-card__message${
+            phase === 'counting' ? ' overlay-card__message--count' : ''
+          }`}
+        >
           {phase === 'card'
             ? message
             : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}
         </p>
       </div>
 
-      <div className="card__actions">
+      <div className="overlay-card__actions">
         {phase === 'card' ? (
           <>
-            <button className="btn btn--primary" onClick={() => onDismiss('done')}>
+            <Button variant="primary" onClick={() => onDismiss('done')}>
               {OVERLAY.ACTION_DONE}
-            </button>
-            <button className="btn" onClick={() => onDismiss('snoozed')}>
-              {OVERLAY.ACTION_SNOOZE}
-            </button>
-            <button className="btn btn--ghost" onClick={() => onDismiss('skipped')}>
+            </Button>
+            <Button onClick={() => onDismiss('snoozed')}>{OVERLAY.ACTION_SNOOZE}</Button>
+            <Button variant="ghost" onClick={() => onDismiss('skipped')}>
               {OVERLAY.ACTION_SKIP}
-            </button>
+            </Button>
           </>
         ) : (
           // 기록은 이미 'done' 으로 남았다. [중단]은 카운트다운만 멈춘다
-          <button className="btn btn--ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             {OVERLAY.COUNTDOWN_STOP}
-          </button>
+          </Button>
         )}
       </div>
     </>
@@ -759,23 +766,23 @@ function SummaryCard({
 
   return (
     <>
-      <div className="card__body">
-        <span className="card__icon" aria-hidden="true">
+      <div className="overlay-card__body">
+        <span className="overlay-card__icon" aria-hidden="true">
           {OVERLAY.SUMMARY_ICON}
         </span>
-        <p className="card__message">
+        <p className="overlay-card__message">
           {OVERLAY.SUMMARY_TITLE} · {OVERLAY.SUMMARY_WORKED} {formatDuration(stats.workedMs)}
         </p>
       </div>
 
       {recorded.length === 0 ? (
-        <p className="card__note">{OVERLAY.SUMMARY_NO_RECORD}</p>
+        <p className="overlay-card__note">{OVERLAY.SUMMARY_NO_RECORD}</p>
       ) : (
-        <ul className="card__summary">
+        <ul className="overlay-card__summary">
           {recorded.map((stat) => (
             <li key={stat.behaviorId}>
               <span>{labels.get(stat.behaviorId) ?? stat.behaviorId}</span>
-              <span className="card__summary-rate">
+              <span className="overlay-card__summary-rate">
                 {formatRate(stat.rate)}
                 <em>
                   {stat.done}/{stat.total}
@@ -786,10 +793,10 @@ function SummaryCard({
         </ul>
       )}
 
-      <div className="card__actions">
-        <button className="btn btn--primary" onClick={onClose}>
+      <div className="overlay-card__actions">
+        <Button variant="primary" onClick={onClose}>
           {OVERLAY.SUMMARY_CLOSE}
-        </button>
+        </Button>
       </div>
     </>
   )

@@ -5,9 +5,36 @@ import {
   MAX_SOUND_VOLUME,
   MIN_IDLE_REMINDER_MINUTES,
   MIN_SOUND_VOLUME,
+  clampIdleReminderMinutes,
   extractLegacyBehaviors,
   normalizeSettings,
 } from './settings'
+
+/**
+ * 리마인더 간격칸도 D2.8 부터 행동의 간격칸과 같은 컴포넌트(NumberField)를 쓴다.
+ * `normalizeSettings` 는 손상된 값을 **기본값으로 되돌리지만** 입력 중인 값은 경계로 붙인다.
+ */
+describe('clampIdleReminderMinutes', () => {
+  it('범위 밖은 가까운 경계로 붙인다 (기본값으로 되돌리지 않는다)', () => {
+    expect(clampIdleReminderMinutes(0)).toBe(MIN_IDLE_REMINDER_MINUTES)
+    expect(clampIdleReminderMinutes(-5)).toBe(MIN_IDLE_REMINDER_MINUTES)
+    expect(clampIdleReminderMinutes(MAX_IDLE_REMINDER_MINUTES + 1)).toBe(MAX_IDLE_REMINDER_MINUTES)
+    expect(clampIdleReminderMinutes(99_999)).toBe(MAX_IDLE_REMINDER_MINUTES)
+  })
+
+  it('빈칸·숫자 아님은 최솟값', () => {
+    for (const bad of ['', ' ', 'abc', null, undefined, Number.NaN]) {
+      expect(clampIdleReminderMinutes(bad)).toBe(MIN_IDLE_REMINDER_MINUTES)
+    }
+  })
+
+  it('경계값과 소수는 그대로 / 반올림해서 통과한다', () => {
+    expect(clampIdleReminderMinutes(MIN_IDLE_REMINDER_MINUTES)).toBe(MIN_IDLE_REMINDER_MINUTES)
+    expect(clampIdleReminderMinutes(MAX_IDLE_REMINDER_MINUTES)).toBe(MAX_IDLE_REMINDER_MINUTES)
+    expect(clampIdleReminderMinutes('30')).toBe(30)
+    expect(clampIdleReminderMinutes(29.6)).toBe(30)
+  })
+})
 
 describe('normalizeSettings', () => {
   it('null 이면 기본값', () => {

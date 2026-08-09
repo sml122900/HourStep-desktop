@@ -19,6 +19,7 @@ import {
   normalizeBehavior,
   normalizeBehaviors,
   restoreBuiltins,
+  sanitizeDigits,
 } from './behaviors'
 import { SEED_BEHAVIORS, seedBehaviors } from './presets'
 import type { Behavior } from './types'
@@ -90,6 +91,47 @@ describe('clampDurationSeconds', () => {
     expect(clampDurationSeconds(MAX_DURATION_SEC)).toBe(MAX_DURATION_SEC)
     expect(clampDurationSeconds('60')).toBe(60)
     expect(clampDurationSeconds(59.6)).toBe(60)
+  })
+})
+
+/**
+ * 숫자칸(`src/components/NumberField.tsx`)이 타이핑 도중 쓰는 정리 함수.
+ * 여기가 무너지면 「지우는 중인데 값이 바뀐다」가 되돌아온다.
+ */
+describe('sanitizeDigits', () => {
+  it('빈칸을 빈칸으로 돌려준다 — 0 으로 확정하지 않는다', () => {
+    expect(sanitizeDigits('')).toBe('')
+    // 마지막 글자를 지우는 순간이 이 경로다. '' 이 0 이 되면 값이 시드로 튄다
+    expect(sanitizeDigits('5'.slice(0, 0))).toBe('')
+  })
+
+  it('숫자가 아닌 글자를 버린다', () => {
+    expect(sanitizeDigits('3a0')).toBe('30')
+    expect(sanitizeDigits('-5')).toBe('5')
+    expect(sanitizeDigits('1.5')).toBe('15')
+    expect(sanitizeDigits('e')).toBe('')
+    expect(sanitizeDigits('삼십')).toBe('')
+  })
+
+  it('선행 0 을 지운다 — 뒤에 숫자가 있을 때만', () => {
+    expect(sanitizeDigits('030')).toBe('30')
+    expect(sanitizeDigits('0001')).toBe('1')
+    expect(sanitizeDigits('0')).toBe('0') // 행위 시간 0초는 유효한 값이다
+    expect(sanitizeDigits('000')).toBe('0')
+  })
+
+  it('경계값은 그대로 통과한다', () => {
+    for (const raw of ['0', '1', '480', '600']) expect(sanitizeDigits(raw)).toBe(raw)
+  })
+
+  it('정리한 문자열을 clamp 에 넘기면 최종값이 범위 안에 든다', () => {
+    // NumberField 가 blur 에서 실제로 하는 두 단계 (정리 → 복구)
+    expect(clampIntervalMinutes(sanitizeDigits(''))).toBe(MIN_INTERVAL_MINUTES)
+    expect(clampIntervalMinutes(sanitizeDigits('030'))).toBe(30)
+    expect(clampIntervalMinutes(sanitizeDigits('600'))).toBe(MAX_INTERVAL_MINUTES)
+    expect(clampDurationSeconds(sanitizeDigits(''))).toBe(MIN_DURATION_SEC)
+    expect(clampDurationSeconds(sanitizeDigits('0'))).toBe(0)
+    expect(clampDurationSeconds(sanitizeDigits('9999'))).toBe(MAX_DURATION_SEC)
   })
 })
 

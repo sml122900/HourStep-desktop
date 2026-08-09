@@ -81,6 +81,8 @@ DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·�
   (마이그레이션 v3). **앱이 AI 결과를 직접 읽지 않는다** (`docs/decisions/0008`)
 - **D2.7 (완료)**: 행위 지속 시간(마이그레이션 v4) + 알림음(WebAudio 합성, 2지점)
   + 발화 큐 (`docs/decisions/0009`)
+- **D2.8 (완료)**: 디자인 시스템 — 토큰 정의 + 공통 컴포넌트 + 4화면 정렬.
+  새 기능 없음. 규격은 `docs/design-system.md`
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
 
@@ -91,6 +93,10 @@ DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·�
   abs 로 하면 30분 알림을 스누즈한 33분이 방금 지나간 30분 정규와 겹쳤다고 지워져 스누즈가 증발한다
 - 통계·설정 반영도 스케줄러와 같은 규칙이다. 순수 함수로 `src/core/` 에 두고 `now`·구간을 인자로 받는다.
   DB 접근은 `src/data/` 어댑터에만 — `src/core/` 는 IO 금지 (eslint 강제)
+- **색·간격·글자 크기는 `src/styles/tokens.css` 토큰에서만 온다.** 창별 CSS 에 색 리터럴
+  (`#`/`rgb()`)과 임의 px 여백을 쓰지 않는다 — 새 값이 필요하면 토큰부터 정의한다.
+  버튼·입력칸·체크박스·카드는 `src/components/` 의 공통 컴포넌트를 쓰고 새로 만들지 않는다.
+  규격·예외는 `docs/design-system.md`, 위반은 `src/styles/tokens.test.ts` 가 잡는다
 - 오버레이 창은 별도 Tauri window로 관리. 메인 창 닫기 = 트레이로 숨김 (앱 종료 아님)
 - 각 Phase 완료 시 docs/daily/에 작업 일지, 기술 결정은 docs/decisions/에 기록
 
@@ -110,11 +116,24 @@ Windows 11 데스크톱 (개발 PC = 도그푸딩 기기). 실행: `pnpm tauri d
 - `PostMessage(WM_CLOSE)` 같은 창 메시지 직접 전송은 합성 입력이 아니므로 허용
 - 자동 검증 결과를 문서에 적을 때는 **어떤 방법으로 얻었는지** 함께 남긴다
   (금지된 방법으로 얻은 과거 근거는 재검증 대상으로 표시)
+- 창을 찾아 캡처할 때 걸리는 것 세 가지 (D2.8 에서 다 밟았다, 상세는 그날 일지):
+  ① **자식 `powershell -File` 프로세스에서는 데스크톱 창이 안 보인다** — `FindWindow`/
+  `EnumWindows` 가 0을 준다. 도구 세션 **안에서**(`& script.ps1`) 돌릴 것
+  ② **WebView2 가 같은 제목의 160×28 보조 창을 띄운다** — 같은 제목 중 가장 큰 것을 고를 것
+  ③ **메인 창은 부팅 때 이미 보인다** — `main-show` 를 기다린다며 부팅 창을 잡는다.
+  벽시계 스케줄 대신 **창 상태 전이**(보임→숨김→보임)를 기다릴 것
 
 ## 프로젝트 구조
 ```
 index.html / overlay.html / settings.html   창별 Vite 엔트리 (rollupOptions.input)
 src/constants/strings.ts                    UI 문구 (한국어) + 내장 행동의 초기 카드 문구
+src/styles/                                 세 창이 공유하는 것 (창별 main.tsx 는 base.css 만 읽는다)
+  tokens.css                                색·간격·반경·그림자·타이포·모션 — 값의 단일 출처
+  components.css                            공통 컴포넌트 스타일 (src/components/ 와 1:1)
+  base.css                                  리셋 + 위 둘 @import + 포커스 링
+  tokens.test.ts                            토큰 밖 하드코딩 잔존 0건을 강제
+src/components/                             전 창 공통 컴포넌트 — 새 버튼/입력칸을 따로 만들지 않는다
+  Button / NumberField / Checkbox / Card / Section / EmptyState
 src/core/                                   IO 없는 순수 모듈 — React·Tauri import 금지 (eslint로 강제)
   types.ts / scheduler.ts / stats.ts / overlayPosition.ts
   behaviors.ts                              행동 정규화·순서·기본값 복원·레거시 흡수
@@ -131,7 +150,6 @@ src/windows/{main,overlay,settings}/        창별 React 앱
   main/MainWindow.tsx                       세션 제어 + 실시간 타이머·예정 목록 + 통계
   settings/SettingsWindow.tsx               행동 CRUD + 테마 + 알림음 + 리마인더 + autostart
   settings/RoutineFinder.tsx                AI 브리지 UI (프롬프트→이동→붙여넣기→미리보기→삽입)
-  settings/NumberInput.tsx                  간격(분)·행위 시간(초) 입력칸 — 입력 중 문자열, blur 에 경계 복구
   overlay/OverlayWindow.tsx                 세션 런타임(발화 판단·큐·카운트다운·CompletionLog)이 여기 산다
 src-tauri/src/lib.rs                        빌더·플러그인·창 이벤트·setup
 src-tauri/src/db.rs                         SQLite 스키마·마이그레이션 (읽기/쓰기는 TS 어댑터)

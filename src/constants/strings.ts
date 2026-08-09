@@ -162,7 +162,7 @@ export const AI = {
 
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D2.7 — 행위 시간 · 알림음 · 발화 큐',
+  PHASE_BADGE: 'Phase D2.8 — 디자인 시스템',
   DESCRIPTION:
     '이 창을 닫아도 앱은 종료되지 않고 트레이에 남습니다. 종료는 트레이 메뉴에서만 가능합니다.',
   TEST_OVERLAY_BUTTON: '테스트 알림 띄우기',

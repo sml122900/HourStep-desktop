@@ -1,4 +1,10 @@
-/* 오버레이 창은 프레임리스 + 투명. 카드 영역 밖은 아무것도 그리지 않는다. */
+/*
+ * 오버레이 창 전용. 프레임리스 + 투명 — 카드 영역 밖은 아무것도 그리지 않는다.
+ *
+ * 여기에는 **그림자(--shadow-*)를 쓰지 않는다.** 창이 카드 실크기라(fitWindow)
+ * 바깥으로 번지는 그림자는 창 밖이라 잘린다 (docs/decisions/0005).
+ * 같은 이유로 카드에 바깥 여백을 주면 안 된다 — 그만큼이 클릭이 막히는 죽은 영역이 된다.
+ */
 html,
 body,
 #root {
@@ -8,10 +14,6 @@ body,
   cursor: default;
 }
 
-/*
- * 창을 카드 실크기로 맞추기 때문에(OverlayWindow.fitWindow) 여기에 여백을 주면
- * 그만큼이 "클릭이 막히는 투명 죽은 영역"이 된다. padding 을 두지 않는 이유.
- */
 .overlay-root {
   height: 100%;
   display: flex;
@@ -19,25 +21,32 @@ body,
   align-items: flex-start;
 }
 
-.card {
-  width: 540px;
-  padding: 18px 22px 16px;
-  border-radius: 18px;
+.overlay-card {
+  /* 본문 왼쪽 선 = 아이콘 폭 + gap. 요약·액션 줄이 여기에 맞춰 들여쓴다 */
+  --icon-size: 48px;
+  --body-indent: calc(var(--icon-size) + var(--sp-3));
 
-  background: var(--card-bg);
+  width: 540px;
+  padding: var(--sp-4) var(--sp-6);
+  border-radius: var(--r-lg);
+
+  background: var(--overlay-bg);
   /*
-   * 바깥으로 번지는 그림자는 창 밖이라 잘려서 안 보인다 (창 = 카드 크기).
-   * 입체감은 테두리 + 안쪽 하이라이트로만 낸다. 라이트에서는 밝은 배경에 묻히지 않도록
-   * 토큰 쪽에서 테두리를 더 진하게 잡아 뒀다 (styles/base.css).
+   * 입체감은 테두리 + 안쪽 하이라이트로만 낸다. 라이트에서는 밝은 배경(문서·에디터)에
+   * 묻히지 않도록 토큰 쪽에서 테두리를 더 진하게 잡아 뒀다 (styles/tokens.css).
    */
-  border: 1px solid var(--card-border);
+  border: 1px solid var(--overlay-border);
   box-shadow:
-    inset 0 1px 0 var(--card-inset-top),
-    inset 0 -1px 0 var(--card-inset-bottom);
+    inset 0 1px 0 var(--overlay-edge-top),
+    inset 0 -1px 0 var(--overlay-edge-bottom);
   backdrop-filter: blur(22px) saturate(140%);
   color: var(--text);
 
-  /* 슬라이드 인/아웃: 창 위쪽(화면 밖)에서 내려온다 */
+  /*
+   * 슬라이드 인/아웃: 창 위쪽(화면 밖)에서 내려온다.
+   * 이 시간은 --dur-* 토큰을 쓰지 않는다 — OverlayWindow.tsx 의 SLIDE_OUT_MS 와
+   * 짝이 맞아야 하는 값이라, 토큰을 건드리면 JS 쪽이 조용히 어긋난다.
+   */
   transform: translateY(-100%);
   opacity: 0;
   transition:
@@ -45,139 +54,95 @@ body,
     opacity 180ms ease-out;
 }
 
-.card--in {
+.overlay-card--in {
   transform: translateY(0);
   opacity: 1;
 }
 
 /* 슬라이드 아웃은 더 빠르고 덤덤하게 (SLIDE_OUT_MS 와 동기화) */
-.card:not(.card--in) {
+.overlay-card:not(.overlay-card--in) {
   transition:
     transform 220ms cubic-bezier(0.4, 0, 1, 1),
     opacity 200ms ease-in;
 }
 
-.card__body {
+.overlay-card__body {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--sp-3);
 }
 
-.card__icon {
+.overlay-card__icon {
   flex: 0 0 auto;
-  width: 46px;
-  height: 46px;
+  width: var(--icon-size);
+  height: var(--icon-size);
   display: grid;
   place-items: center;
-  font-size: 24px;
-  border-radius: 14px;
-  background: var(--accent-soft);
+  font-size: var(--fs-icon);
+  border-radius: var(--r-lg);
+  background: var(--accent-tint);
   border: 1px solid var(--accent-line);
 }
 
-.card__message {
+.overlay-card__message {
   margin: 0;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
   letter-spacing: -0.01em;
-  line-height: 1.4;
 }
 
 /*
  * 카운트다운 중. 눈을 감고 있다가 뜨거나 스트레칭 자세에서 곁눈질로 보는 숫자라
  * 문구보다 크고, 자릿수가 바뀔 때 흔들리지 않게 고정폭 숫자로 그린다.
  */
-.card__message--count {
-  font-size: 30px;
+.overlay-card__message--count {
+  font-size: var(--fs-display);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
 
-.card__actions {
+.overlay-card__actions {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  padding-left: 60px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  padding-left: var(--body-indent);
 }
 
 /* 세션 종료 요약 */
-.card__note {
-  margin: 14px 0 0;
-  padding-left: 60px;
-  font-size: 14px;
-  color: var(--text-dim);
+.overlay-card__note {
+  margin: var(--sp-3) 0 0;
+  padding-left: var(--body-indent);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
-.card__summary {
-  margin: 14px 0 0;
-  padding: 0 0 0 60px;
+.overlay-card__summary {
+  margin: var(--sp-3) 0 0;
+  padding: 0 0 0 var(--body-indent);
   list-style: none;
   display: grid;
-  gap: 6px;
+  gap: var(--sp-1);
 }
 
-.card__summary li {
+.overlay-card__summary li {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 16px;
-  font-size: 14px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: var(--card-row-bg);
+  gap: var(--sp-4);
+  font-size: var(--fs-sm);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-sm);
+  background: var(--bg-sunken);
 }
 
-.card__summary-rate {
+.overlay-card__summary-rate {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: var(--fw-bold);
 }
 
-.card__summary-rate em {
-  margin-left: 8px;
+.overlay-card__summary-rate em {
+  margin-left: var(--sp-2);
   font-style: normal;
-  font-weight: 400;
-  color: var(--text-dim);
-}
-
-.btn {
-  padding: 8px 15px;
-  border-radius: 10px;
-  border: 1px solid var(--btn-border);
-  background: var(--btn-bg);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
-  transition:
-    background 120ms ease,
-    transform 90ms ease;
-}
-
-.btn:hover {
-  background: var(--btn-hover);
-}
-
-.btn:active {
-  transform: translateY(1px);
-}
-
-.btn--primary {
-  background: var(--accent-grad);
-  border-color: var(--accent);
-  color: var(--accent-on);
-  font-weight: 600;
-}
-
-.btn--primary:hover {
-  background: var(--accent-grad-hover);
-}
-
-.btn--ghost {
-  background: transparent;
-  border-color: transparent;
-  color: var(--text-dim);
-}
-
-.btn--ghost:hover {
-  background: var(--btn-ghost-hover);
-  color: var(--text);
+  font-weight: var(--fw-normal);
+  color: var(--text-muted);
 }

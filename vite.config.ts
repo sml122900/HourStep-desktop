@@ -55,5 +55,8 @@ export default defineConfig(async () => ({
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     passWithNoTests: true,
+    // 기본값(false)이면 vitest 가 CSS 를 빈 모듈로 갈아치운다. `?raw` 로 원문을 읽는
+    // src/styles/tokens.test.ts 가 전부 빈 문자열을 검사하고 조용히 통과해 버린다.
+    css: true,
   },
 }))
