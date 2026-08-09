@@ -19,6 +19,7 @@ import {
   normalizeBehavior,
   normalizeBehaviors,
   restoreBuiltins,
+  liveNumber,
   sanitizeDigits,
 } from './behaviors'
 import { SEED_BEHAVIORS, seedBehaviors } from './presets'
@@ -132,6 +133,45 @@ describe('sanitizeDigits', () => {
     expect(clampDurationSeconds(sanitizeDigits(''))).toBe(MIN_DURATION_SEC)
     expect(clampDurationSeconds(sanitizeDigits('0'))).toBe(0)
     expect(clampDurationSeconds(sanitizeDigits('9999'))).toBe(MAX_DURATION_SEC)
+  })
+})
+
+/**
+ * 「값이 3일 때 백스페이스를 눌러도 지워지지 않고 30으로 되돌아간다」 회귀.
+ *
+ * 원인은 clamp 함수가 아니라 **clamp 를 언제 부르느냐**였다. onChange 에서 부르면
+ * 빈칸이 그 자리에서 기본값으로 확정되고 커서가 앞으로 밀려 더 지울 수도 없다.
+ * 그래서 편집 중에는 이 함수가 `null` 을 돌려 위로 올리지 않고, 확정은 blur 의 clamp 만 한다.
+ *
+ * 같은 버그가 두 번 났다 — 행동 간격칸(D2.6 후속), 세션 미시작 리마인더칸(D2.8).
+ * 두 번째는 clamp 만 통일하고 컴포넌트를 안 바꾼 채 한 Phase 를 넘겼다.
+ * 그 규칙이 컴포넌트 안에만 있어서 테스트가 닿지 않았다 — 그래서 순수 함수로 빼 둔다.
+ */
+describe('liveNumber — 편집 중 위로 올릴 값 고르기', () => {
+  const LO = MIN_INTERVAL_MINUTES
+  const HI = MAX_INTERVAL_MINUTES
+
+  it('`3` 에서 백스페이스 → 빈칸은 위로 올라가지 않는다 (화면만 빈칸)', () => {
+    expect(liveNumber(sanitizeDigits('3'), LO, HI)).toBe(3)
+    // 백스페이스 한 번 = 입력값이 '' 이 된 상태. 여기서 값을 올리면 30 이 되돌아온다
+    expect(liveNumber(sanitizeDigits(''), LO, HI)).toBeNull()
+  })
+
+  it('범위 밖도 위로 올리지 않는다 — 타이핑 도중에는 잠시 벗어날 수 있다', () => {
+    expect(liveNumber('0', LO, HI)).toBeNull() // 최솟값 1 미만
+    expect(liveNumber('9999', LO, HI)).toBeNull() // 상한 초과
+    // `48` → `480` 을 치는 도중. 중간값도 범위 안이면 그대로 올라간다
+    expect(liveNumber('48', LO, HI)).toBe(48)
+  })
+
+  it('경계값은 올라간다', () => {
+    expect(liveNumber(String(LO), LO, HI)).toBe(LO)
+    expect(liveNumber(String(HI), LO, HI)).toBe(HI)
+  })
+
+  it('행위 시간칸의 `0` 은 빈칸이 아니라 유효한 값이다 (즉시 행동)', () => {
+    expect(liveNumber('', MIN_DURATION_SEC, MAX_DURATION_SEC)).toBeNull()
+    expect(liveNumber('0', MIN_DURATION_SEC, MAX_DURATION_SEC)).toBe(0)
   })
 })
 

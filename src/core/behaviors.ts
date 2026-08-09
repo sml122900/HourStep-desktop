@@ -98,6 +98,22 @@ export function sanitizeDigits(raw: string): string {
   return raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
 }
 
+/**
+ * 정리된 숫자 문자열 중 **지금 위로 올려도 되는 값**만 골라낸다. 아니면 `null`.
+ *
+ * 이게 이 버그류의 방어선이다 — 빈칸(지우는 중)과 범위 밖은 **화면에만 두고** 위로
+ * 올리지 않는다. 올려 버리면 저장·정규화가 돌아 `3` 을 지운 순간 `30` 이 되돌아오고,
+ * 커서가 앞으로 밀려 더는 지울 수도 없다. 확정은 blur 의 `clamp*` 가 맡는다.
+ *
+ * 함수로 빼 둔 이유: 이 규칙이 컴포넌트 안에만 있으면 **테스트가 닿지 않는다.**
+ * 실제로 같은 버그가 두 번 났다 — 간격칸(D2.6 후속), 리마인더칸(D2.8 에서 교체).
+ */
+export function liveNumber(digits: string, min: number, max: number): number | null {
+  if (digits === '') return null
+  const n = Number(digits)
+  return n >= min && n <= max ? n : null
+}
+
 /** interval 행동의 간격(분). atElapsed 면 0 */
 export function intervalMinutes(behavior: Behavior): number {
   return behavior.rule.kind === 'interval' ? Math.round(behavior.rule.everyMs / MIN) : 0

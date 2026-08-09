@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { liveNumber } from './behaviors'
 import {
   DEFAULT_SETTINGS,
   MAX_IDLE_REMINDER_MINUTES,
@@ -33,6 +34,24 @@ describe('clampIdleReminderMinutes', () => {
     expect(clampIdleReminderMinutes(MAX_IDLE_REMINDER_MINUTES)).toBe(MAX_IDLE_REMINDER_MINUTES)
     expect(clampIdleReminderMinutes('30')).toBe(30)
     expect(clampIdleReminderMinutes(29.6)).toBe(30)
+  })
+
+  /**
+   * 「값이 3일 때 백스페이스를 눌러도 지워지지 않는다」 회귀. 이 칸이 마지막까지
+   * 생 `<input>` + onChange 즉시 clamp 였다 (0.2.1 설치본에 남아 있던 증상).
+   * 규칙 자체는 `liveNumber` 가 지킨다 — 여기서는 **이 칸의 경계로** 같이 확인한다.
+   */
+  it('편집 중에는 빈칸을 허용하고, 확정은 blur 의 clamp 만 한다', () => {
+    const LO = MIN_IDLE_REMINDER_MINUTES
+    const HI = MAX_IDLE_REMINDER_MINUTES
+
+    expect(liveNumber('3', LO, HI)).toBe(3)
+    expect(liveNumber('', LO, HI)).toBeNull() // 백스페이스 직후 — 위로 올리지 않는다
+    expect(liveNumber('0', LO, HI)).toBeNull() // 최솟값 1 미만
+
+    expect(clampIdleReminderMinutes('')).toBe(LO) // blur 에서 최솟값으로 복구
+    expect(clampIdleReminderMinutes('9999')).toBe(HI) // 범위 밖은 경계로
+    expect(clampIdleReminderMinutes('3')).toBe(3) // 정상값은 그대로
   })
 })
 

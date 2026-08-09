@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { sanitizeDigits } from '../core/behaviors'
+import { liveNumber, sanitizeDigits } from '../core/behaviors'
 
 /**
  * 정수 입력칸 (간격(분)·행위 시간(초)·AI 미리보기 줄이 전부 이걸 쓴다).
@@ -63,9 +63,9 @@ export default function NumberField({
         const next = sanitizeDigits(e.target.value)
         setDraft(next)
 
-        const n = Number(next)
-        // 유효할 때만 위로 올린다. 범위 밖·빈칸은 blur 에서 복구한다
-        if (next !== '' && n >= min && n <= max) onChange(n)
+        // 유효할 때만 위로 올린다. 범위 밖·빈칸은 화면에만 두고 blur 에서 복구한다
+        const live = liveNumber(next, min, max)
+        if (live !== null) onChange(live)
       }}
       onBlur={() => {
         focused.current = false
