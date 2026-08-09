@@ -61,7 +61,8 @@
   - `IntervalInput` → `NumberInput` 일반화(간격·행위 시간·AI 미리보기 줄이 같은 칸을 쓴다)
   - vitest **128개** (+ overlayQueue 11 / clampDurationSeconds·시드·볼륨 보강)
 - **D2.8 (2026-08-09)** — 디자인 시스템 정립 + UI 점검. 새 기능 없음.
-  규격 `docs/design-system.md`, 일지 `docs/daily/2026-08-09-phase-d2.8.md`
+  규격 `docs/design-system.md`, 일지 `docs/daily/2026-08-09-phase-d2.8.md`,
+  근거 `docs/decisions/0010`
   - **토큰** `src/styles/tokens.css` — 색·간격(4px 격자)·반경·그림자·타이포(4단)·모션 두 벌.
     `base.css` 가 토큰과 컴포넌트 CSS 를 `@import` 하므로 창별 엔트리는 그대로
   - **대비 3건 수정** (AA 4.5:1): 다크/라이트 `--text-subtle`, 흰 글자 on 주 버튼.
@@ -166,3 +167,4 @@
 | [0007](docs/decisions/0007-behaviors-runtime-source-db.md) | 행동의 런타임 소스는 DB, 시드는 TS 코드 | D2.5 |
 | [0008](docs/decisions/0008-ai-search-bridge-copy-paste.md) | AI 루틴은 딥링크 + 복사·붙여넣기로 (앱이 결과를 읽지 않는다) | D2.6 |
 | [0009](docs/decisions/0009-overlay-queue-serialize.md) | 겹친 발화는 병합하지 않고 큐로 직렬화 | D2.7 |
+| [0010](docs/decisions/0010-design-tokens-and-css-guardrail.md) | 디자인 값은 토큰 한 곳에서만, 위반은 stylelint 대신 vitest 로 | D2.8 |
