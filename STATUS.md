@@ -78,7 +78,8 @@ D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 �
     트랙(`auto` = max-content). `grid-template-columns: minmax(0, 1fr)` 로 해소
   - 하드코딩 색·여백 잔존을 vitest 가 강제(`src/styles/tokens.test.ts`). vitest **150개**
 
-- **D2.8 후속 (2026-08-09)** — 「AI 열기」 대상 확장. 채팅형 AI 를 **드롭다운**으로 접고
+- **D2.8 후속 (2026-08-09)** — 일지 `docs/daily/2026-08-09-d2.8-followup.md`.
+  「AI 열기」 대상 확장. 채팅형 AI 를 **드롭다운**으로 접고
   8곳으로 늘렸다 (영문 이름 알파벳 내림차순: Qwen / Perplexity / Kimi / Grok / Gemini /
   DeepSeek / Claude / ChatGPT). 검색형(구글 AI 모드)만 버튼으로 남는다.
   - 화면 배치는 `kind: 'search' | 'chat'`, URL 주입 가능 여부는 `injectsPrompt` —
@@ -91,7 +92,9 @@ D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 �
   규칙(`빈칸·범위 밖은 위로 올리지 않는다`)이 `NumberField` 안에만 있어 테스트가 닿지
   않았고, 그래서 같은 버그가 두 번(D2.6 간격칸 / D2.8 리마인더칸) 났다.
   `liveNumber()` 순수 함수로 빼고 회귀 케이스를 붙였다. vitest **160개**.
-  **동작 변화는 없다** — 리마인더칸은 D2.8(`2eb8576`)에 이미 고쳐져 있었다
+  **동작 변화는 없다** — 리마인더칸은 D2.8(`2eb8576`)에 이미 고쳐져 있었다.
+  근거 `docs/decisions/0011`, 진단 기록
+  `docs/troubleshooting/fixed-bug-reported-again-version-skew.md`
 
 ## 진행 중
 
@@ -190,3 +193,4 @@ D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 �
 | [0008](docs/decisions/0008-ai-search-bridge-copy-paste.md) | AI 루틴은 딥링크 + 복사·붙여넣기로 (앱이 결과를 읽지 않는다) | D2.6 |
 | [0009](docs/decisions/0009-overlay-queue-serialize.md) | 겹친 발화는 병합하지 않고 큐로 직렬화 | D2.7 |
 | [0010](docs/decisions/0010-design-tokens-and-css-guardrail.md) | 디자인 값은 토큰 한 곳에서만, 위반은 stylelint 대신 vitest 로 | D2.8 |
+| [0011](docs/decisions/0011-ui-rules-as-pure-functions.md) | 화면 동작 규칙은 컴포넌트가 아니라 순수 함수에 (테스트가 닿게) | D2.8 후속 |
