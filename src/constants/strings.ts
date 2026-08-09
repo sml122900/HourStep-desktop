@@ -133,6 +133,8 @@ export const AI = {
   TARGETS_LABEL: 'AI 열기',
   TARGET_OPEN: '{name} 열기',
   TARGET_OPEN_PASTE: '{name} 열기 (붙여넣기 필요)',
+  /** 채팅형 AI 드롭다운. 화면에는 서비스 이름만 보이므로 라벨은 스크린리더용이다 */
+  CHAT_PICK_LABEL: '채팅형 AI 고르기',
   TARGETS_HINT: '어느 AI를 써도 괜찮아요. 열면 프롬프트가 자동으로 복사됩니다.',
   OPEN_ERROR: '브라우저를 열지 못했습니다.',
 

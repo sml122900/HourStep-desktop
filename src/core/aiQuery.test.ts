@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   AI_TARGETS,
+  CHAT_TARGETS,
+  DEFAULT_CHAT_TARGET_ID,
   MAX_JOB_LENGTH,
   MAX_PROMPT_LENGTH,
   MAX_SYMPTOM_LENGTH,
+  SEARCH_TARGETS,
+  aiTargetById,
   buildAiUrl,
   buildRoutinePrompt,
 } from './aiQuery'
@@ -63,9 +67,49 @@ describe('buildRoutinePrompt', () => {
 describe('AI_TARGETS / buildAiUrl', () => {
   const byId = (id: string) => AI_TARGETS.find((t) => t.id === id)!
 
-  it('구글·ChatGPT·Claude 세 곳이고, 프롬프트 주입은 구글만 된다', () => {
-    expect(AI_TARGETS.map((t) => t.id)).toEqual(['google', 'chatgpt', 'claude'])
+  it('검색형은 구글 하나, 나머지는 전부 채팅형이다', () => {
+    expect(SEARCH_TARGETS.map((t) => t.id)).toEqual(['google'])
+    expect(CHAT_TARGETS).toHaveLength(8)
+    expect(SEARCH_TARGETS.length + CHAT_TARGETS.length).toBe(AI_TARGETS.length)
+  })
+
+  it('프롬프트 주입은 구글만 된다 — kind 와 겸용하지 않는다', () => {
     expect(AI_TARGETS.filter((t) => t.injectsPrompt).map((t) => t.id)).toEqual(['google'])
+    for (const target of CHAT_TARGETS) expect(target.injectsPrompt).toBe(false)
+  })
+
+  it('채팅형은 영문 이름 알파벳 내림차순이다', () => {
+    const names = CHAT_TARGETS.map((t) => t.name)
+    expect(names).toEqual([
+      'Qwen',
+      'Perplexity',
+      'Kimi',
+      'Grok',
+      'Gemini',
+      'DeepSeek',
+      'Claude',
+      'ChatGPT',
+    ])
+    // 순서를 손으로 적어 둔 위가 정말 내림차순인지도 기계로 확인한다
+    expect(names).toEqual([...names].sort((a, b) => b.localeCompare(a, 'en')))
+  })
+
+  it('id 가 겹치지 않고 주소도 서로 다르다', () => {
+    const ids = AI_TARGETS.map((t) => t.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    const urls = AI_TARGETS.map((t) => buildAiUrl(t, ''))
+    expect(new Set(urls).size).toBe(urls.length)
+  })
+
+  it('드롭다운 기본값은 실재하는 채팅형이다 — 목록 순서와 무관하게 정한다', () => {
+    const fallback = aiTargetById(DEFAULT_CHAT_TARGET_ID)
+    expect(fallback?.kind).toBe('chat')
+    // 정렬 규칙이 곧 추천이 되지 않게, 첫 줄을 기본값으로 삼지 않는다
+    expect(DEFAULT_CHAT_TARGET_ID).not.toBe(CHAT_TARGETS[0].id)
+  })
+
+  it('없는 id 로는 대상을 만들지 않는다', () => {
+    expect(aiTargetById('nope')).toBeUndefined()
   })
 
   it('구글은 AI 모드(udm=50)로 가고 프롬프트를 q 에 싣는다', () => {

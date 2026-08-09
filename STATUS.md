@@ -78,6 +78,16 @@
     트랙(`auto` = max-content). `grid-template-columns: minmax(0, 1fr)` 로 해소
   - 하드코딩 색·여백 잔존을 vitest 가 강제(`src/styles/tokens.test.ts`). vitest **150개**
 
+- **D2.8 후속 (2026-08-09)** — 「AI 열기」 대상 확장. 채팅형 AI 를 **드롭다운**으로 접고
+  8곳으로 늘렸다 (영문 이름 알파벳 내림차순: Qwen / Perplexity / Kimi / Grok / Gemini /
+  DeepSeek / Claude / ChatGPT). 검색형(구글 AI 모드)만 버튼으로 남는다.
+  - 화면 배치는 `kind: 'search' | 'chat'`, URL 주입 가능 여부는 `injectsPrompt` —
+    **별개 필드**로 둔다 (`docs/decisions/0008` 갱신분)
+  - 채팅형은 전부 `injectsPrompt: false`. 일부가 `?q=` 를 받지만 파라미터가 서비스마다
+    다르고 예고 없이 바뀌는데, **틀리면 프롬프트가 조용히 사라진 채 빈 채팅이 열린다**
+  - 컨트롤 높이를 토큰화(`--h-sm` / `--h-md`) — 드롭다운이 옆 버튼과 밑선을 맞춰야 했다
+  - vitest **155개** (+ 목록 순서·중복·기본값 5)
+
 ## 진행 중
 
 없음. **다음 작업은 D3.**

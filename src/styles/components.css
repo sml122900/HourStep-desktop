@@ -26,13 +26,13 @@
 }
 
 .btn--sm {
-  height: 28px;
+  height: var(--h-sm);
   padding: 0 var(--sp-3);
   font-size: var(--fs-sm);
 }
 
 .btn--md {
-  height: 34px;
+  height: var(--h-md);
   padding: 0 var(--sp-4);
   font-size: var(--fs-md);
 }
@@ -43,11 +43,11 @@
 }
 
 .btn--icon.btn--sm {
-  width: 28px;
+  width: var(--h-sm);
 }
 
 .btn--icon.btn--md {
-  width: 34px;
+  width: var(--h-md);
 }
 
 .btn--primary {

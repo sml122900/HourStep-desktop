@@ -47,6 +47,13 @@ MVP 제약은 그대로다: **계정 없음, 서버 없음, API 키 없음** (CL
 주소는 `AI_TARGETS` / `TARGET_URL` **한 곳에만** 적는다. 서비스 도메인은 바뀐다
 (chat.openai.com → chatgpt.com 처럼). UI 도 테스트도 이 상수를 참조한다.
 
+> **2026-08-09 갱신**: 채팅형 대상이 8곳(Qwen / Perplexity / Kimi / Grok / Gemini /
+> DeepSeek / Claude / ChatGPT)으로 늘면서 버튼을 나열하지 않고 **드롭다운**으로 접었다.
+> 검색형(구글 AI 모드)만 버튼으로 남는다 — 프롬프트가 URL 에 실려 한 번에 가기 때문이다.
+> 화면 배치(`kind`)와 URL 주입 가능 여부(`injectsPrompt`)는 **별개 필드**다.
+> 지금은 우연히 같이 움직이지만 한 열에 두 의미를 태우면 둘 중 하나는 어긋난다
+> (이 문서가 `is_builtin`/`source` 에서 편 것과 같은 논지).
+
 ### 왜 앱이 직접 읽지 않나
 
 - **API 키·서버가 필요 없다.** Anthropic/OpenAI 를 붙이면 키 보관·과금·계정이 딸려 온다.

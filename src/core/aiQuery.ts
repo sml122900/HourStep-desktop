@@ -34,18 +34,32 @@ export interface RoutineQueryInput {
   symptom: string
 }
 
-export type AiTargetId = 'google' | 'chatgpt' | 'claude'
+export type AiTargetId =
+  'google' | 'qwen' | 'perplexity' | 'kimi' | 'grok' | 'gemini' | 'deepseek' | 'claude' | 'chatgpt'
 
 export interface AiTarget {
   id: AiTargetId
   /** 서비스 이름 (고유명사라 문구 상수로 빼지 않는다) */
   name: string
   /**
+   * 화면에 어떻게 놓이는가. `search` 는 버튼 하나로 바로 가고, `chat` 은 드롭다운에서 고른다.
+   *
+   * **`injectsPrompt` 와 겸용하지 않는다.** 지금은 두 값이 우연히 같이 움직이지만
+   * (구글만 search 이자 유일한 주입 대상) 의미가 다르다 — 한 열에 두 의미를 태우면
+   * 둘 중 하나는 언젠가 어긋난다. ChatGPT 처럼 `?q=` 를 받는 채팅형이 나중에 주입 대상이
+   * 되더라도 드롭다운에 남아야 한다 (같은 논지: docs/decisions/0008).
+   */
+  kind: 'search' | 'chat'
+  /**
    * 프롬프트를 URL 에 실을 수 있는가.
    *
-   * 구글만 검색어 파라미터(`q`)로 주입된다. ChatGPT·Claude 는 홈만 열리므로 사용자가
+   * 구글만 검색어 파라미터(`q`)로 주입된다. 채팅형은 홈만 열리므로 사용자가
    * 직접 붙여넣어야 한다 — 버튼 문구가 그 사실을 밝힌다. 그래서 **어느 쪽이든 이동 시
    * 클립보드에 넣는 것**이 이 기능의 핵심 동작이다(복사 없이 이동하면 무의미하다).
+   *
+   * 일부 채팅형도 `?q=` 를 받지만 켜 두지 않았다. 서비스마다 파라미터 이름과 지원 여부가
+   * 다르고 예고 없이 바뀌는데, **틀리면 프롬프트가 조용히 사라진 채 빈 채팅이 열린다.**
+   * 클립보드 경로는 어디서든 똑같이 동작한다.
    */
   injectsPrompt: boolean
 }
@@ -53,18 +67,50 @@ export interface AiTarget {
 /**
  * 이동할 AI 목록 — **도메인은 여기에만 적는다.** 서비스 주소는 바뀐다
  * (chat.openai.com → chatgpt.com 처럼). UI·테스트 전부 이 상수를 참조한다.
+ *
+ * 채팅형은 **영문 이름 알파벳 내림차순**이다. 우열을 매기지 않으려는 것 —
+ * 어느 AI를 쓸지는 사용자가 이미 정해 두고 오는 선택이라 앱이 순위를 제시할 이유가 없다.
  */
 export const AI_TARGETS: readonly AiTarget[] = [
-  { id: 'google', name: '구글 AI 모드', injectsPrompt: true },
-  { id: 'chatgpt', name: 'ChatGPT', injectsPrompt: false },
-  { id: 'claude', name: 'Claude', injectsPrompt: false },
+  { id: 'google', name: '구글 AI 모드', kind: 'search', injectsPrompt: true },
+  { id: 'qwen', name: 'Qwen', kind: 'chat', injectsPrompt: false },
+  { id: 'perplexity', name: 'Perplexity', kind: 'chat', injectsPrompt: false },
+  { id: 'kimi', name: 'Kimi', kind: 'chat', injectsPrompt: false },
+  { id: 'grok', name: 'Grok', kind: 'chat', injectsPrompt: false },
+  { id: 'gemini', name: 'Gemini', kind: 'chat', injectsPrompt: false },
+  { id: 'deepseek', name: 'DeepSeek', kind: 'chat', injectsPrompt: false },
+  { id: 'claude', name: 'Claude', kind: 'chat', injectsPrompt: false },
+  { id: 'chatgpt', name: 'ChatGPT', kind: 'chat', injectsPrompt: false },
 ]
+
+/** 버튼으로 내놓는 것 (지금은 구글 하나) */
+export const SEARCH_TARGETS: readonly AiTarget[] = AI_TARGETS.filter((t) => t.kind === 'search')
+
+/** 드롭다운에 넣는 것. 늘어나도 버튼이 줄줄이 늘어나지 않는다 */
+export const CHAT_TARGETS: readonly AiTarget[] = AI_TARGETS.filter((t) => t.kind === 'chat')
+
+/**
+ * 드롭다운의 초기 선택. 목록 순서(내림차순)와 무관하게 정한다 —
+ * 첫 줄이 기본값이면 정렬 규칙이 곧 추천이 돼 버린다.
+ */
+export const DEFAULT_CHAT_TARGET_ID: AiTargetId = 'chatgpt'
 
 /** 대상별 진입 주소. `udm=50` 은 구글 AI 모드의 식별자다. */
 const TARGET_URL: Record<AiTargetId, string> = {
   google: 'https://www.google.com/search?udm=50',
-  chatgpt: 'https://chatgpt.com/',
+  qwen: 'https://chat.qwen.ai/',
+  perplexity: 'https://www.perplexity.ai/',
+  kimi: 'https://www.kimi.com/',
+  grok: 'https://grok.com/',
+  gemini: 'https://gemini.google.com/app',
+  deepseek: 'https://chat.deepseek.com/',
   claude: 'https://claude.ai/new',
+  chatgpt: 'https://chatgpt.com/',
+}
+
+/** id → 대상. 드롭다운이 문자열만 들고 있으므로 되돌릴 길이 필요하다 */
+export function aiTargetById(id: string): AiTarget | undefined {
+  return AI_TARGETS.find((t) => t.id === id)
 }
 
 /**

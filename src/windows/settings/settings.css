@@ -177,6 +177,18 @@ body {
   width: 100%;
 }
 
+/*
+ * 채팅형 AI 고르기. 선택에 따라 옆 버튼 문구 길이가 바뀌므로 이 칸은 폭을 고정한다.
+ * 높이는 옆 버튼과 같은 토큰을 본다 — `.field` 의 세로 패딩으로는 2px 어긋난다.
+ * 세로 패딩을 0으로 두는 이유: 네이티브 select 는 글자를 알아서 가운데 맞춘다.
+ */
+.ai__pick {
+  width: 140px;
+  height: var(--h-sm);
+  padding-block: 0;
+  cursor: pointer;
+}
+
 .ai__paste {
   resize: vertical;
   line-height: var(--lh-base);

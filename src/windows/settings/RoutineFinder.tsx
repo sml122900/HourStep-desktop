@@ -3,7 +3,16 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { AI_TARGETS, buildAiUrl, buildRoutinePrompt, type AiTarget } from '../../core/aiQuery'
+import {
+  CHAT_TARGETS,
+  DEFAULT_CHAT_TARGET_ID,
+  SEARCH_TARGETS,
+  aiTargetById,
+  buildAiUrl,
+  buildRoutinePrompt,
+  type AiTarget,
+  type AiTargetId,
+} from '../../core/aiQuery'
 import {
   MAX_EMOJI_CODEPOINTS,
   MAX_INTERVAL_MINUTES,
@@ -93,6 +102,8 @@ export default function RoutineFinder({
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  /** 드롭다운에서 고른 채팅형 AI. 열기 버튼이 이걸 연다 */
+  const [chatTargetId, setChatTargetId] = useState<AiTargetId>(DEFAULT_CHAT_TARGET_ID)
   const toastTimer = useRef(0)
   const sectionRef = useRef<HTMLElement>(null)
 
@@ -184,6 +195,9 @@ export default function RoutineFinder({
     setRows((prev) => prev?.map((row, i) => (i === index ? { ...row, ...patch } : row)) ?? prev)
   }
 
+  // 목록이 비는 경우는 없지만(코어 상수) 타입상 undefined 가 나올 수 있어 첫 항목으로 받친다
+  const chatTarget = aiTargetById(chatTargetId) ?? CHAT_TARGETS[0]
+
   // 이름이 빈 줄은 넣지 않는다 (수동 입력 줄을 그냥 두고 확인을 눌렀을 때)
   const selected = (rows ?? []).filter((row) => row.checked && row.label.trim())
   const overflow = selected.length > remaining
@@ -240,14 +254,33 @@ export default function RoutineFinder({
           <div className="ai__field">
             <span>{AI.TARGETS_LABEL}</span>
             <div className="row row--wrap">
-              {AI_TARGETS.map((target) => (
+              {/* 검색형(구글)은 프롬프트가 URL 에 실리므로 버튼 하나로 바로 간다 */}
+              {SEARCH_TARGETS.map((target) => (
                 <Button key={target.id} size="sm" onClick={() => void openTarget(target)}>
-                  {(target.injectsPrompt ? AI.TARGET_OPEN : AI.TARGET_OPEN_PASTE).replace(
-                    '{name}',
-                    target.name
-                  )}
+                  {AI.TARGET_OPEN.replace('{name}', target.name)}
                 </Button>
               ))}
+
+              {/*
+                채팅형은 목록에서 고른다. 버튼으로 늘어놓으면 서비스가 늘어날 때마다 줄이
+                한 칸씩 길어지고, 어느 것을 쓸지는 사용자가 이미 정해 두고 오는 선택이라
+                전부 펼쳐 보일 이유가 없다.
+              */}
+              <select
+                className="field ai__pick"
+                value={chatTargetId}
+                aria-label={AI.CHAT_PICK_LABEL}
+                onChange={(e) => setChatTargetId(e.target.value as AiTargetId)}
+              >
+                {CHAT_TARGETS.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name}
+                  </option>
+                ))}
+              </select>
+              <Button size="sm" onClick={() => void openTarget(chatTarget)}>
+                {AI.TARGET_OPEN_PASTE.replace('{name}', chatTarget.name)}
+              </Button>
             </div>
           </div>
           <p className="hint">{AI.TARGETS_HINT}</p>
