@@ -29,8 +29,18 @@ import {
 import { routineItemsToBehaviors, type RoutineItem } from '../../core/routineParse'
 import { THEME_PREFERENCES, type ThemePreference } from '../../core/theme'
 import type { Behavior } from '../../core/types'
+import {
+  AGE_GROUPS,
+  DEFAULT_SESSION_HOURS,
+  SEXES,
+  type AgeGroup,
+  type Profile,
+  type Sex,
+  suggestWaterInterval,
+  waterReference,
+} from '../../core/waterGoal'
 import * as db from '../../data/db'
-import { AI, SETTINGS } from '../../constants/strings'
+import { ACTION_CARDS_DISCLAIMER, AI, SETTINGS } from '../../constants/strings'
 import Button from '../../components/Button'
 import Card from '../../components/Card'
 import Checkbox from '../../components/Checkbox'
@@ -48,6 +58,18 @@ const THEME_LABEL: Record<ThemePreference, string> = {
   dark: SETTINGS.THEME_DARK,
 }
 
+const SEX_LABEL: Record<Sex, string> = {
+  male: SETTINGS.PROFILE_SEX_MALE,
+  female: SETTINGS.PROFILE_SEX_FEMALE,
+}
+
+const AGE_GROUP_LABEL: Record<AgeGroup, string> = {
+  '19-29': SETTINGS.PROFILE_AGE_19_29,
+  '30-49': SETTINGS.PROFILE_AGE_30_49,
+  '50-64': SETTINGS.PROFILE_AGE_50_64,
+  '65+': SETTINGS.PROFILE_AGE_65_PLUS,
+}
+
 /** 이모지 입력 상한. maxLength 는 UTF-16 단위라 코드포인트의 2배로 잡는다 */
 const EMOJI_MAXLENGTH = MAX_EMOJI_CODEPOINTS * 2
 
@@ -55,6 +77,8 @@ export default function SettingsWindow() {
   const [autostart, setAutostart] = useState<boolean | null>(null)
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [behaviors, setBehaviors] = useState<Behavior[] | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   /**
@@ -77,6 +101,13 @@ export default function SettingsWindow() {
       .then(setBehaviors)
       .catch((e) => {
         console.error('[settings] 행동 로드 실패', e)
+        setError(SETTINGS.SAVE_ERROR)
+      })
+
+    db.loadProfile()
+      .then(setProfile)
+      .catch((e) => {
+        console.error('[settings] 신체정보 로드 실패', e)
         setError(SETTINGS.SAVE_ERROR)
       })
   }, [])
@@ -112,6 +143,21 @@ export default function SettingsWindow() {
       console.error('[settings] 저장 실패', e)
       setError(SETTINGS.SAVE_ERROR)
       setSettings(await db.loadSettings().catch(() => null))
+    }
+  }, [])
+
+  /**
+   * 신체정보 저장 (D2.9). 선택 입력이라 즉시 저장 — 글자 입력이 아니라 버튼 선택이라
+   * 커밋 시점을 따로 둘 이유가 없다. 다른 창의 스케줄에 영향이 없어 방송하지 않는다.
+   */
+  const persistProfile = useCallback(async (draft: Profile) => {
+    setError(null)
+    try {
+      setProfile(await db.saveProfile(draft))
+    } catch (e) {
+      console.error('[settings] 신체정보 저장 실패', e)
+      setError(SETTINGS.SAVE_ERROR)
+      setProfile(await db.loadProfile().catch(() => null))
     }
   }, [])
 
@@ -372,12 +418,80 @@ export default function SettingsWindow() {
             : SETTINGS.BEHAVIORS_HINT}
         </p>
         <p className="hint">{SETTINGS.BEHAVIOR_RESTORE_HINT}</p>
+
+        {/* 근거 보기 (D2.9) — 간격이 왜 지금 값인지, 아카이브 카피 예시를 그대로 보여준다 */}
+        <Button size="sm" variant="ghost" onClick={() => setEvidenceOpen((v) => !v)}>
+          {SETTINGS.EVIDENCE_ENTRY}
+        </Button>
+        {evidenceOpen && (
+          <div className="evidence">
+            <p>{SETTINGS.EVIDENCE_STRETCH}</p>
+            <p>{SETTINGS.EVIDENCE_EYES}</p>
+            <p className="hint">{ACTION_CARDS_DISCLAIMER}</p>
+          </div>
+        )}
       </Section>
 
       <RoutineFinder
         remaining={Math.max(0, MAX_BEHAVIORS - (behaviors?.length ?? MAX_BEHAVIORS))}
         onInsert={insertRoutine}
       />
+
+      <Section title={SETTINGS.PROFILE_TITLE}>
+        <p className="hint">{SETTINGS.PROFILE_WHY}</p>
+
+        <div className="row row--split">
+          <span className="field-label">{SETTINGS.PROFILE_SEX_LABEL}</span>
+          <div className="segmented">
+            {SEXES.map((sex) => (
+              <Button
+                key={sex}
+                size="sm"
+                variant={profile?.sex === sex ? 'primary' : 'ghost'}
+                disabled={profile === null}
+                onClick={() =>
+                  profile &&
+                  void persistProfile({
+                    ...profile,
+                    sex: profile.sex === sex ? null : sex,
+                  })
+                }
+              >
+                {SEX_LABEL[sex]}
+              </Button>
+            ))}
+            {profile?.sex === null && <span className="tag">{SETTINGS.PROFILE_UNSET}</span>}
+          </div>
+        </div>
+
+        <div className="row row--split">
+          <span className="field-label">{SETTINGS.PROFILE_AGE_LABEL}</span>
+          <div className="segmented">
+            {AGE_GROUPS.map((age) => (
+              <Button
+                key={age}
+                size="sm"
+                variant={profile?.ageGroup === age ? 'primary' : 'ghost'}
+                disabled={profile === null}
+                onClick={() =>
+                  profile &&
+                  void persistProfile({
+                    ...profile,
+                    ageGroup: profile.ageGroup === age ? null : age,
+                  })
+                }
+              >
+                {AGE_GROUP_LABEL[age]}
+              </Button>
+            ))}
+            {profile?.ageGroup === null && <span className="tag">{SETTINGS.PROFILE_UNSET}</span>}
+          </div>
+        </div>
+
+        <p className="hint">{SETTINGS.PROFILE_SKIP_HINT}</p>
+      </Section>
+
+      <WaterSection profile={profile} behaviors={behaviors} onApply={persistBehaviors} />
 
       <Section title={SETTINGS.THEME_TITLE}>
         <div className="segmented">
@@ -488,5 +602,61 @@ export default function SettingsWindow() {
 
       {error && <p className="error">{error}</p>}
     </main>
+  )
+}
+
+/**
+ * 물 참고 기준 (D2.9, 아카이브 §2). 신체정보가 없으면 일반값 경로로 자연스럽게 빠진다
+ * (`waterReference` 가 null 을 받아도 문구를 낸다). 간격은 **제안만** — [제안 적용]을
+ * 눌러야 실제 '물마시기' 행동의 간격이 바뀐다 (자동 변경 금지).
+ */
+function WaterSection({
+  profile,
+  behaviors,
+  onApply,
+}: {
+  profile: Profile | null
+  behaviors: Behavior[] | null
+  onApply: (draft: Behavior[]) => Promise<void>
+}) {
+  const reference = waterReference(profile?.sex ?? null, profile?.ageGroup ?? null)
+  const water = behaviors?.find((b) => b.id === 'water')
+  const suggested = suggestWaterInterval(reference.liquidMl ?? 0, DEFAULT_SESSION_HOURS)
+  const currentInterval = water ? intervalMinutes(water) : null
+
+  return (
+    <Section title={SETTINGS.WATER_TITLE}>
+      <p>{reference.label}</p>
+      <p className="hint">{SETTINGS.WATER_ACTIVITY_HINT}</p>
+
+      {water && (
+        <div className="row row--split">
+          <p className="hint">
+            {SETTINGS.WATER_SUGGESTION_HINT.replace('{n}', String(suggested)).replace(
+              '{hours}',
+              String(DEFAULT_SESSION_HOURS)
+            )}
+          </p>
+          <Button
+            size="sm"
+            disabled={currentInterval === suggested}
+            onClick={() =>
+              behaviors &&
+              void onApply(
+                behaviors.map((b) =>
+                  b.id === 'water'
+                    ? { ...b, rule: { kind: 'interval' as const, everyMs: suggested * MIN } }
+                    : b
+                )
+              )
+            }
+          >
+            {SETTINGS.WATER_APPLY_SUGGESTION}
+          </Button>
+        </div>
+      )}
+
+      <p className="hint">⚠ {SETTINGS.WATER_DISCLAIMER}</p>
+    </Section>
   )
 }

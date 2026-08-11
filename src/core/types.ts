@@ -56,6 +56,12 @@ export interface Behavior {
   source: BehaviorSource
   /** 목록 표시 순서. 오름차순, 0부터 연속 */
   sortOrder: number
+  /**
+   * 동작 로테이션의 마지막 인덱스 (D2.9). 지금은 내장 스트레칭(`id === 'stretch'`)만 쓴다 —
+   * 발화마다 `src/core/actionRotation.ts` 의 다음 동작으로 전진하고 DB 에 남아 세션을 넘어 이어진다.
+   * 그 외 행동에는 의미 없는 값이라 항상 0 이다.
+   */
+  actionIndex: number
 }
 
 export interface Occurrence {

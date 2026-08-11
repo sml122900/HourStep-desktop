@@ -99,6 +99,14 @@ describe('normalizeSettings', () => {
     }
   })
 
+  it('백그라운드 안내 플래그는 기본 false, 명시적 true 만 보존한다', () => {
+    expect(DEFAULT_SETTINGS.backgroundNoticeShown).toBe(false)
+    expect(normalizeSettings({ backgroundNoticeShown: true }).backgroundNoticeShown).toBe(true)
+    expect(normalizeSettings({ backgroundNoticeShown: 1 as never }).backgroundNoticeShown).toBe(
+      false
+    )
+  })
+
   it('D2 의 behaviors 필드는 버린다 — 저장하면 자동으로 사라진다', () => {
     const got = normalizeSettings({
       behaviors: [{ behaviorId: 'water', enabled: false, everyMinutes: 10 }],

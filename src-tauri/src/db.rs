@@ -108,5 +108,26 @@ pub fn migrations() -> Vec<Migration> {
              WHERE id = 'eyes' AND is_builtin = 1 AND duration_sec = 0;
         ",
     },
+    // D2.9 — 근거 프로토콜 연결. 두 가지를 한 버전에 묶는다(v2 도 그랬다):
+    // ① 신체정보(성별·연령대) — 수분 참고 기준이 성별·연령별이라서 필요하다. 선택 입력,
+    //    체중 등은 수집하지 않는다. 별도 `profile` 테이블(싱글턴 행)로 둔다 — 향후 계정 동기화
+    //    로드맵에서 `settings` 의 불투명 JSON 한 덩어리보다 열 단위로 다루기 쉽다.
+    // ② 동작 로테이션 — 스트레칭 카드가 매 발화 다음 동작으로 넘어간다. 상태(마지막 인덱스)는
+    //    그 행동 자체에 속하는 사실이라 `behaviors` 행에 둔다(`duration_sec` 과 같은 결).
+    Migration {
+        version: 5,
+        description: "profile_and_action_rotation",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE IF NOT EXISTS profile (
+                id        INTEGER PRIMARY KEY CHECK (id = 1),
+                sex       TEXT,
+                age_group TEXT
+            );
+            INSERT OR IGNORE INTO profile (id, sex, age_group) VALUES (1, NULL, NULL);
+
+            ALTER TABLE behaviors ADD COLUMN action_index INTEGER NOT NULL DEFAULT 0;
+        ",
+    },
     ]
 }

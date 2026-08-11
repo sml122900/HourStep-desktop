@@ -25,6 +25,7 @@ function behavior(over: Partial<Behavior> = {}): Behavior {
     isBuiltin: true,
     source: 'user',
     sortOrder: 0,
+    actionIndex: 0,
     ...over,
   }
 }

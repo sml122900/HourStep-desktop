@@ -28,6 +28,11 @@ export interface AppSettings {
   soundEnabled: boolean
   /** 0~100. 0 이면 켜져 있어도 들리지 않는다 */
   soundVolume: number
+  /**
+   * 창을 처음 숨길 때(닫기 X, 백그라운드 실행 버튼 공통) 뜨는 1회성 안내 토스트를
+   * 이미 보여줬는가. 세션이 아니라 **설치 전체에서 한 번**이라 여기 앱 설정에 둔다.
+   */
+  backgroundNoticeShown: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -36,6 +41,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: DEFAULT_THEME,
   soundEnabled: true,
   soundVolume: 60,
+  backgroundNoticeShown: false,
 }
 
 /** 범위 밖이면 **기본값으로 되돌린다** (경계로 붙이지 않는다 — 저장된 값이 손상된 경우다) */
@@ -87,6 +93,10 @@ export function normalizeSettings(partial: Partial<AppSettings> | null | undefin
       MIN_SOUND_VOLUME,
       MAX_SOUND_VOLUME
     ),
+    backgroundNoticeShown:
+      typeof partial.backgroundNoticeShown === 'boolean'
+        ? partial.backgroundNoticeShown
+        : DEFAULT_SETTINGS.backgroundNoticeShown,
   }
 }
 

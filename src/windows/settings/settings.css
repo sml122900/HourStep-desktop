@@ -110,6 +110,28 @@ body {
   flex: 0 0 auto;
 }
 
+/* ─── 신체정보 / 근거 보기 (D2.9) ─── */
+
+.field-label {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+}
+
+.evidence p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
 .tag {
   flex: 0 0 auto;
   padding: 0 var(--sp-2);

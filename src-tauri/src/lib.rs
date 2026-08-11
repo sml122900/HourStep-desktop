@@ -27,6 +27,8 @@ pub fn run() {
         // D2.6 — AI 로 이동할 때 프롬프트를 클립보드에 넣는다. 웹뷰의 navigator.clipboard 는
         // 패키징 후 오리진(tauri://)에서 조용히 실패할 수 있어 플러그인 경로로 간다.
         .plugin(tauri_plugin_clipboard_manager::init())
+        // 최초 1회 「백그라운드에서 계속 실행돼요」 안내 토스트 (창을 처음 숨길 때, TS 가 판단).
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),
@@ -48,6 +50,7 @@ pub fn run() {
             session::start_session_command,
             windows::hide_main_window,
             windows::open_settings_window,
+            windows::show_action_detail,
             windows::trigger_test_overlay,
         ])
         .on_window_event(|window, event| {
@@ -56,9 +59,13 @@ pub fn run() {
                 if window.label() == overlay::OVERLAY_LABEL {
                     return;
                 }
-                // 창을 닫아도 앱은 살아있고 트레이로 숨는다. 종료는 트레이 메뉴에서만.
+                // 창을 닫아도 앱은 살아있고 백그라운드로 숨는다. 완전 종료는 트레이 메뉴에서만.
                 api.prevent_close();
-                let _ = window.hide();
+                if window.label() == windows::MAIN_LABEL {
+                    windows::hide_main(&window.app_handle());
+                } else {
+                    let _ = window.hide();
+                }
             }
         })
         .setup(|app| {

@@ -159,11 +159,8 @@ fn run_step(app: &AppHandle, step: &str) {
         }
 
         "main-show" => windows::show_window(app, windows::MAIN_LABEL),
-        "main-hide" => {
-            if let Some(w) = app.get_webview_window(windows::MAIN_LABEL) {
-                let _ = w.hide();
-            }
-        }
+        // 트레이 X 닫기 / [백그라운드에서 실행] 버튼과 같은 경로 (main://hidden 이벤트까지 낸다)
+        "main-hide" => windows::hide_main(app),
 
         "dump" => dump(app),
 

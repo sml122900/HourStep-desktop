@@ -284,7 +284,8 @@ describe('cardMessage', () => {
   })
 
   it('문구가 있으면 문구를 쓴다', () => {
-    expect(cardMessage(seedBehaviors()[1])).toBe('물 한 잔 마실 시간이에요')
+    // D2.9 부터 E1 원고 첫 줄(docs/content/hourstep-action-cards.md)
+    expect(cardMessage(seedBehaviors()[1])).toBe('한 번에 몰아 마시기보다 나눠서 자주')
   })
 })
 

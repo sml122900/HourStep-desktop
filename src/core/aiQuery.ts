@@ -68,19 +68,19 @@ export interface AiTarget {
  * 이동할 AI 목록 — **도메인은 여기에만 적는다.** 서비스 주소는 바뀐다
  * (chat.openai.com → chatgpt.com 처럼). UI·테스트 전부 이 상수를 참조한다.
  *
- * 채팅형은 **영문 이름 알파벳 내림차순**이다. 우열을 매기지 않으려는 것 —
+ * 채팅형은 **영문 이름 알파벳 오름차순**이다. 우열을 매기지 않으려는 것 —
  * 어느 AI를 쓸지는 사용자가 이미 정해 두고 오는 선택이라 앱이 순위를 제시할 이유가 없다.
  */
 export const AI_TARGETS: readonly AiTarget[] = [
   { id: 'google', name: '구글 AI 모드', kind: 'search', injectsPrompt: true },
-  { id: 'qwen', name: 'Qwen', kind: 'chat', injectsPrompt: false },
-  { id: 'perplexity', name: 'Perplexity', kind: 'chat', injectsPrompt: false },
-  { id: 'kimi', name: 'Kimi', kind: 'chat', injectsPrompt: false },
-  { id: 'grok', name: 'Grok', kind: 'chat', injectsPrompt: false },
-  { id: 'gemini', name: 'Gemini', kind: 'chat', injectsPrompt: false },
-  { id: 'deepseek', name: 'DeepSeek', kind: 'chat', injectsPrompt: false },
-  { id: 'claude', name: 'Claude', kind: 'chat', injectsPrompt: false },
   { id: 'chatgpt', name: 'ChatGPT', kind: 'chat', injectsPrompt: false },
+  { id: 'claude', name: 'Claude', kind: 'chat', injectsPrompt: false },
+  { id: 'deepseek', name: 'DeepSeek', kind: 'chat', injectsPrompt: false },
+  { id: 'gemini', name: 'Gemini', kind: 'chat', injectsPrompt: false },
+  { id: 'grok', name: 'Grok', kind: 'chat', injectsPrompt: false },
+  { id: 'kimi', name: 'Kimi', kind: 'chat', injectsPrompt: false },
+  { id: 'perplexity', name: 'Perplexity', kind: 'chat', injectsPrompt: false },
+  { id: 'qwen', name: 'Qwen', kind: 'chat', injectsPrompt: false },
 ]
 
 /** 버튼으로 내놓는 것 (지금은 구글 하나) */
@@ -89,10 +89,7 @@ export const SEARCH_TARGETS: readonly AiTarget[] = AI_TARGETS.filter((t) => t.ki
 /** 드롭다운에 넣는 것. 늘어나도 버튼이 줄줄이 늘어나지 않는다 */
 export const CHAT_TARGETS: readonly AiTarget[] = AI_TARGETS.filter((t) => t.kind === 'chat')
 
-/**
- * 드롭다운의 초기 선택. 목록 순서(내림차순)와 무관하게 정한다 —
- * 첫 줄이 기본값이면 정렬 규칙이 곧 추천이 돼 버린다.
- */
+/** 드롭다운의 초기 선택. 가장 널리 쓰이는 채팅형이라 ChatGPT 를 기본값으로 둔다 */
 export const DEFAULT_CHAT_TARGET_ID: AiTargetId = 'chatgpt'
 
 /** 대상별 진입 주소. `udm=50` 은 구글 AI 모드의 식별자다. */

@@ -12,6 +12,7 @@ import { seedBehaviors } from '../core/presets'
 import type { AppSettings } from '../core/settings'
 import { extractLegacyBehaviors, normalizeSettings } from '../core/settings'
 import type { Behavior, CompletionLog, WorkSession } from '../core/types'
+import { type Profile, normalizeProfile } from '../core/waterGoal'
 
 /** src-tauri/src/db.rs 의 `DB_URL` 과 반드시 같아야 한다 */
 const DB_URL = 'sqlite:hourstep.db'
@@ -55,6 +56,7 @@ interface BehaviorRow {
   is_builtin: number
   source: string
   sort_order: number
+  action_index: number
 }
 
 const toSession = (r: SessionRow): WorkSession => ({
@@ -86,6 +88,7 @@ const toBehavior = (r: BehaviorRow): Behavior => ({
   // 범위 밖 값 정리는 normalizeBehaviors 가 한다 (v3 이전 행은 DEFAULT 로 'user')
   source: r.source === 'ai' ? 'ai' : 'user',
   sortOrder: r.sort_order,
+  actionIndex: r.action_index,
 })
 
 // ─── 세션 ────────────────────────────────────────────────────────────────
@@ -198,8 +201,8 @@ function upsertBehavior(behavior: Behavior, verb: 'INSERT OR IGNORE' | 'INSERT O
   return db().then((conn) =>
     conn.execute(
       `${verb} INTO behaviors
-         (id, label, emoji, message, every_ms, duration_sec, enabled, is_builtin, source, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+         (id, label, emoji, message, every_ms, duration_sec, enabled, is_builtin, source, sort_order, action_index)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         behavior.id,
         behavior.label,
@@ -211,6 +214,7 @@ function upsertBehavior(behavior: Behavior, verb: 'INSERT OR IGNORE' | 'INSERT O
         behavior.isBuiltin ? 1 : 0,
         behavior.source,
         behavior.sortOrder,
+        behavior.actionIndex,
       ]
     )
   )
@@ -221,10 +225,24 @@ export async function loadBehaviors(): Promise<Behavior[]> {
   await seedBehaviorsIfEmpty()
   const conn = await db()
   const rows = await conn.select<BehaviorRow[]>(
-    `SELECT id, label, emoji, message, every_ms, duration_sec, enabled, is_builtin, source, sort_order
+    `SELECT id, label, emoji, message, every_ms, duration_sec, enabled, is_builtin, source, sort_order, action_index
        FROM behaviors ORDER BY sort_order, id`
   )
   return normalizeBehaviors(rows.map(toBehavior))
+}
+
+/**
+ * 로테이션 인덱스만 저장한다(D2.9). 전체 목록을 다시 정규화·저장하는
+ * `saveBehaviorsAndBroadcast` 를 쓰지 않는 이유 — 발화마다 도는 값이라 그 무거운 경로를
+ * 타면 방송(`BEHAVIORS_CHANGED`)이 매번 나가 다른 창의 스케줄 재계산을 불필요하게 깨운다.
+ * 다음 발화 판단에만 영향을 주면 되므로 조용히 쓴다.
+ */
+export async function saveActionIndex(behaviorId: string, actionIndex: number): Promise<void> {
+  const conn = await db()
+  await conn.execute('UPDATE behaviors SET action_index = $1 WHERE id = $2', [
+    Math.max(0, Math.trunc(actionIndex)),
+    behaviorId,
+  ])
 }
 
 /**
@@ -294,6 +312,35 @@ export async function saveSettingsAndBroadcast(draft: AppSettings): Promise<AppS
   return settings
 }
 
+// ─── 신체정보 (D2.9) ────────────────────────────────────────────────────
+
+interface ProfileRow {
+  sex: string | null
+  age_group: string | null
+}
+
+/**
+ * 선택 입력 신체정보. 마이그레이션 v5 가 심어 둔 싱글턴 행(id=1)을 읽고 쓴다.
+ * 물 참고 기준 계산에만 쓰이고 다른 창의 스케줄에 영향이 없어 방송하지 않는다
+ * (설정 창만 읽고 쓰는 값이라 다른 창이 알 필요가 없다).
+ */
+export async function loadProfile(): Promise<Profile> {
+  const conn = await db()
+  const rows = await conn.select<ProfileRow[]>('SELECT sex, age_group FROM profile WHERE id = 1')
+  if (rows.length === 0) return normalizeProfile(null)
+  return normalizeProfile({ sex: rows[0].sex as Profile['sex'], ageGroup: rows[0].age_group as Profile['ageGroup'] })
+}
+
+export async function saveProfile(draft: Profile): Promise<Profile> {
+  const profile = normalizeProfile(draft)
+  const conn = await db()
+  await conn.execute(
+    'INSERT OR REPLACE INTO profile (id, sex, age_group) VALUES (1, $1, $2)',
+    [profile.sex, profile.ageGroup]
+  )
+  return profile
+}
+
 // ─── 자동 검증용 ─────────────────────────────────────────────────────────
 
 /** `--debug-cmd db-dump` 이 찍을 한 줄. write→재시작→read 왕복 확인에 쓴다. */
@@ -317,10 +364,13 @@ export async function summarize(): Promise<string> {
             SUM(CASE WHEN source = 'ai' THEN 1 ELSE 0 END) AS ai_n
        FROM behaviors`
   )
+  // v5(D2.9) — profile 이 없던 v4 DB 에도 마이그레이션이 싱글턴 행을 심었는지 확인용
+  const profile = await loadProfile()
   return (
     `db sessions=${sessions.n} open=${sessions.open ?? 0} workedMs=${sessions.worked} ` +
     `logs=${logs.n} done=${logs.done ?? 0} labeled=${logs.labeled ?? 0} ` +
-    `behaviors=${behaviors.n} enabled=${behaviors.enabled_n ?? 0} ai=${behaviors.ai_n ?? 0}`
+    `behaviors=${behaviors.n} enabled=${behaviors.enabled_n ?? 0} ai=${behaviors.ai_n ?? 0} ` +
+    `profile(sex=${profile.sex ?? 'null'},age=${profile.ageGroup ?? 'null'})`
   )
 }
 
@@ -331,7 +381,7 @@ export async function summarizeBehaviors(): Promise<string> {
     (b) =>
       `${b.sortOrder}:${b.id}(${b.emoji}${b.label},${intervalMinutes(b)}m,${b.durationSec}s,` +
       `${b.enabled ? 'on' : 'off'}${b.isBuiltin ? ',builtin' : ''}` +
-      `${b.source === 'ai' ? ',ai' : ''})`
+      `${b.source === 'ai' ? ',ai' : ''},action=${b.actionIndex})`
   )
   return `behaviors n=${behaviors.length} ${parts.join(' ')}`
 }

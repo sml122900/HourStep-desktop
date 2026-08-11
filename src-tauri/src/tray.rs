@@ -28,7 +28,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let test = MenuItem::with_id(app, ID_TEST_NOTIFICATION, "테스트 알림", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, ID_SETTINGS, "설정", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, ID_QUIT, "종료", true, None::<&str>)?;
+    // 창 숨김(=백그라운드 실행)과 구분하기 위한 문구. strings.ts TRAY.QUIT 와 같은 값이어야 한다.
+    let quit = MenuItem::with_id(app, ID_QUIT, "완전히 종료", true, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&session_item, &test, &settings, &sep, &quit])?;
     app.manage(SessionMenuItem(Mutex::new(session_item)));

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from '@tauri-apps/plugin-notification'
+import { type ActionCard, actionById } from '../../core/actionRotation'
 import { computeNextOccurrences } from '../../core/scheduler'
+import { DEFAULT_SETTINGS, type AppSettings } from '../../core/settings'
 import { computeStats, type Range, type Stats } from '../../core/stats'
 import type { Behavior, CompletionLog, Occurrence, WorkSession } from '../../core/types'
 import * as db from '../../data/db'
@@ -52,6 +59,8 @@ async function loadSource(now: number): Promise<Source> {
 export default function MainWindow() {
   const [source, setSource] = useState<Source | null>(null)
   const [session, setSession] = useState<WorkSession | null>(null)
+  /** 오버레이 [자세히] → `windows::show_action_detail` 가 이 창을 띄우며 실어 보낸다 (D2.9) */
+  const [detailAction, setDetailAction] = useState<ActionCard | null>(null)
 
   /**
    * "지금"은 Rust 의 1초 tick 이 준다. `Date.now()` 가 아닌 이유는 두 가지 —
@@ -61,6 +70,11 @@ export default function MainWindow() {
    */
   const [now, setNow] = useState(() => Date.now())
   const nowRef = useRef(now)
+
+  /**
+   * 백그라운드 안내 토스트 판단에만 쓴다. 화면에 그리는 값이 아니라서 상태로 두지 않는다.
+   */
+  const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS)
 
   const reload = useCallback(() => {
     loadSource(nowRef.current)
@@ -107,6 +121,65 @@ export default function MainWindow() {
       unlisteners.forEach((p) => void p.then((fn) => fn()))
     }
   }, [reload, applySession])
+
+  useEffect(() => {
+    const applySettings = (s: AppSettings) => {
+      settingsRef.current = s
+    }
+    db.loadSettings().then(applySettings).catch((e) => console.error('[main] 설정 조회 실패', e))
+    const unlisten = listen(db.SETTINGS_CHANGED, () => {
+      db.loadSettings().then(applySettings).catch((e) => console.error('[main] 설정 조회 실패', e))
+    })
+    return () => void unlisten.then((fn) => fn())
+  }, [])
+
+  /** 오버레이 [자세히] — 동작 id 만 실려 온다. 방법 전체·시간·출처는 여기서 `actionById` 로 찾는다 */
+  useEffect(() => {
+    const unlisten = listen<string>('main://action-detail', (e) => {
+      const action = actionById(e.payload)
+      if (action) setDetailAction(action)
+    })
+    return () => void unlisten.then((fn) => fn())
+  }, [])
+
+  /**
+   * 창을 처음 숨길 때(닫기 X, [백그라운드에서 실행] 버튼 — 둘 다 Rust 의 `windows::hide_main`
+   * 한 곳으로 모여 `main://hidden` 을 낸다) 시스템 토스트로 한 번만 안내한다.
+   *
+   * Page Visibility(`document.hidden`/`visibilitychange`) 가 아니라 Rust 가 보내는 이벤트를 쓴다 —
+   * 실측 결과 WebView2 는 `ShowWindow(SW_HIDE)` 로 숨겨도 `visibilitychange` 를 신뢰성 있게
+   * 주지 않았다(오버레이가 raw Win32 로 숨어서 `is_visible()` 이 어긋나는 것과 같은 결의 문제,
+   * `docs/decisions/0001`). 플래그는 세션이 아니라 **설치 전체에서 한 번**이라 앱 설정에 둔다
+   * (`backgroundNoticeShown`).
+   */
+  useEffect(() => {
+    const unlisten = listen('main://hidden', () => {
+      if (settingsRef.current.backgroundNoticeShown) return
+      // 권한 요청이 오래 걸려도 그 사이 두 번 뜨지 않도록 먼저 막아 둔다
+      const next = { ...settingsRef.current, backgroundNoticeShown: true }
+      settingsRef.current = next
+
+      void (async () => {
+        let granted = false
+        try {
+          granted = await isPermissionGranted()
+          if (!granted) granted = (await requestPermission()) === 'granted'
+          if (granted) {
+            sendNotification({
+              title: MAIN.BACKGROUND_NOTICE_TITLE,
+              body: MAIN.BACKGROUND_NOTICE_BODY,
+            })
+          }
+        } catch (e) {
+          console.error('[main] 백그라운드 안내 실패', e)
+        }
+        void invoke('log_debug', { line: `background-notice granted=${granted}` })
+        db.saveSettingsAndBroadcast(next).catch((e) => console.error('[main] 설정 저장 실패', e))
+      })()
+    })
+
+    return () => void unlisten.then((fn) => fn())
+  }, [])
 
   const behaviors = useMemo(() => source?.behaviors ?? [], [source])
 
@@ -178,10 +251,19 @@ export default function MainWindow() {
           <span className="badge">{MAIN.PHASE_BADGE}</span>
           <h1>{MAIN.TITLE}</h1>
         </div>
-        <Button size="sm" onClick={() => invoke('open_settings_window')}>
-          {MAIN.OPEN_SETTINGS_BUTTON}
-        </Button>
+        <div className="topbar__actions">
+          <Button variant="secondary" onClick={() => invoke('hide_main_window')}>
+            {MAIN.BACKGROUND_BUTTON}
+          </Button>
+          <Button size="sm" onClick={() => invoke('open_settings_window')}>
+            {MAIN.OPEN_SETTINGS_BUTTON}
+          </Button>
+        </div>
       </header>
+
+      {detailAction && (
+        <ActionDetailCard action={detailAction} onClose={() => setDetailAction(null)} />
+      )}
 
       <SessionPanel
         session={session}
@@ -209,11 +291,40 @@ export default function MainWindow() {
 
       <div className="actions">
         <Button onClick={() => invoke('trigger_test_overlay')}>{MAIN.TEST_OVERLAY_BUTTON}</Button>
-        <Button onClick={() => invoke('hide_main_window')}>{MAIN.HIDE_BUTTON}</Button>
       </div>
 
       <p className="hint">{MAIN.DESCRIPTION}</p>
     </main>
+  )
+}
+
+/**
+ * 스트레칭 로테이션 상세(D2.9) — 오버레이 카드는 좁아서(540×139) 이름 + 방법 첫 줄만
+ * 보여준다. 방법 전체·시간·출처는 여기서 원고(`src/constants/strings.ts` ACTION_CARDS)
+ * 그대로 보여준다.
+ */
+function ActionDetailCard({ action, onClose }: { action: ActionCard; onClose: () => void }) {
+  return (
+    <Card as="section" className="action-detail">
+      <div className="action-detail__head">
+        <h2>{action.name}</h2>
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          {MAIN.ACTION_DETAIL_CLOSE}
+        </Button>
+      </div>
+      <ul className="action-detail__method">
+        {action.method.map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ul>
+      <p className="action-detail__row">
+        <span>{MAIN.ACTION_DETAIL_DURATION_LABEL}</span>
+        <strong>{action.duration}</strong>
+      </p>
+      <p className="action-detail__source">
+        {MAIN.ACTION_DETAIL_SOURCE_LABEL}: {action.source}
+      </p>
+    </Card>
   )
 }
 

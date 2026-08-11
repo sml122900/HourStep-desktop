@@ -5,13 +5,17 @@
 
 export const APP_NAME = 'HourStep'
 
-/** 실제 트레이 메뉴는 src-tauri/src/tray.rs 가 만든다. 여기는 대조용 사본이다. */
+/**
+ * 실제 트레이 메뉴는 src-tauri/src/tray.rs 가 만든다. 여기는 대조용 사본이다.
+ * "트레이"는 내부(코드·문서) 용어로만 남긴다 — 사용자 노출 문구에는 쓰지 않는다.
+ */
 export const TRAY = {
   START_SESSION: '▶ 작업 시작',
   END_SESSION: '■ 작업 종료',
   TEST_NOTIFICATION: '테스트 알림',
   SETTINGS: '설정',
-  QUIT: '종료',
+  /** 창 숨김(=백그라운드 실행)과 구분하기 위한 문구 */
+  QUIT: '완전히 종료',
   TOOLTIP: 'HourStep — 작업 중 휴식 리마인더',
 } as const
 
@@ -21,17 +25,100 @@ export const TRAY = {
  * D2.5 부터 문구는 사용자가 고칠 수 있는 데이터이고 DB(behaviors.message)가 런타임 소스다.
  * 여기 값은 최초 시드와 「기본값 복원」이 되돌릴 기준값이다.
  *
+ * D2.9 부터 `water`/`eyes` 는 `docs/content/hourstep-action-cards.md` 원고(E1/D1)의
+ * 첫 줄을 그대로 가져온다 — 카드가 한 줄만 보여줄 수 있어서 나머지 줄(출처 포함)은 신지
+ * 않았다. `stretch` 는 카드 문구를 쓰지 않는다 — D2.9 부터 오버레이가 이 값 대신
+ * `src/core/actionRotation.ts` 의 오늘의 동작을 보여준다(`docs/decisions/0012`).
+ * 이 값은 폴백·목록 표시용으로만 남는다.
+ *
  * CLAUDE.md 규칙 6: 건강 효용 문구는 연구 인용형("~라는 연구가 있어요")만 쓸 수 있고
- * 치료·개선 단정은 금지다. 지금은 **효용 주장을 아예 넣지 않았다** — 실제 출처 없이
- * "~라는 연구가 있어요" 를 지어내는 건 규칙을 지키는 게 아니라 어기는 것이기 때문.
- * 인용할 연구가 정해지면 아래 문구에 한 문장씩 덧붙이면 된다 (is_builtin 플래그가 그 자리다).
+ * 치료·개선 단정은 금지다. 원고 문구는 임의로 고치지 않는다(같은 규칙 8) — 오탈자 등은
+ * 발견 시 보고만 한다.
  */
 export const BEHAVIOR_MESSAGE: Record<string, string> = {
-  // 사용자가 D0에서 직접 쓴 카피 — 그대로 유지 (CLAUDE.md 규칙 8)
+  // 사용자가 D0에서 직접 쓴 카피 — 그대로 유지. 오버레이는 D2.9 부터 이 값을 쓰지 않는다.
   stretch: '일어나서 1분 스트레칭할 시간이에요',
-  water: '물 한 잔 마실 시간이에요',
-  eyes: '눈 감고 1분, 눈을 쉬게 해줄 시간이에요',
+  // E1 원고 첫 줄 (docs/content/hourstep-action-cards.md)
+  water: '한 번에 몰아 마시기보다 나눠서 자주',
+  // D1 원고 첫 줄
+  eyes: '창밖이나 방에서 가장 먼 곳을 바라봐요 (6m 이상이면 좋아요)',
 }
+
+/**
+ * 동작 카드 원고 (`docs/content/hourstep-action-cards.md`) — 스트레칭 로테이션(D2.9)이 쓴다.
+ * 사용자가 직접 쓴 원고 취급: 임의 수정 금지, 우려가 있으면 지적만 한다(CLAUDE.md 규칙 8).
+ * `**볼드**` 마크다운만 벗겨냈다 — 카드가 마크다운을 렌더링하지 않는다. 문장은 그대로다.
+ *
+ * B2·B3·B4 는 2026-08-11 수정본에서 B1 과 같은 출처 문장(Clin Rehabil, 2016)으로 통일됐다 —
+ * "동일"이라는 축약 표현이 로테이션 순서상 맥락을 잃는 문제(B4 는 B1 바로 뒤가 아니다)를
+ * 없앴다. C2 도 같은 수정본에서 "OSHA" → "미국 산업안전보건청(OSHA)"로 풀어 썼다(C1 과 통일).
+ */
+export const ACTION_CARDS: Record<
+  string,
+  { name: string; method: readonly string[]; duration: string; source: string }
+> = {
+  A1: {
+    name: '앉았다 일어나기 (의자 스쿼트)',
+    method: ['의자에서 완전히 일어섰다가 다시 앉기를 반복해요', '손은 사용하지 않고 다리 힘으로, 천천히'],
+    duration: '1분간 반복 (본인 속도로)',
+    source: '30분마다 1분 반복 기립이 2분 걷기만큼 식후 인슐린을 낮췄다는 연구가 있어요 (J Appl Physiol, 2021)',
+  },
+  A2: {
+    name: '가볍게 걷기',
+    method: ['자리에서 일어나 복도나 방 안을 천천히 걸어요', '물 뜨러 가기, 창밖 보러 가기도 좋아요'],
+    duration: '2~5분',
+    source: '좌식을 짧은 걷기로 중단하면 식후 혈당 반응이 낮아졌다는 연구가 있어요 (Diabetes Care, 2012)',
+  },
+  B1: {
+    name: '목 옆으로 기울이기',
+    method: [
+      '한 손을 머리에 얹고 귀가 어깨에 닿는 방향으로 천천히 기울여요',
+      '반대쪽 목 옆이 당기는 느낌에서 멈추고 유지',
+    ],
+    duration: '15~30초 × 좌우 각 1회',
+    source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+  },
+  B2: {
+    name: '어깨 으쓱하고 내리기',
+    method: ['숨 들이쉬며 어깨를 귀 쪽으로 최대한 올려요', '3초 멈춘 뒤 숨 내쉬며 툭 떨어뜨려요'],
+    duration: '10회 반복',
+    source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+  },
+  B3: {
+    name: '턱 당기기',
+    method: ['시선은 정면, 턱을 뒤로 밀어 이중턱을 만들어요', '뒷목이 길어지는 느낌으로 5초 유지'],
+    duration: '10회 반복',
+    source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+  },
+  B4: {
+    name: '가슴 펴기',
+    method: [
+      '등 뒤에서 깍지 끼고 팔을 아래로 뻗으며 가슴을 열어요',
+      '어깨가 뒤로 모이는 느낌에서 유지 (문틀 잡고 해도 좋아요)',
+    ],
+    duration: '15~30초 × 2회',
+    source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+  },
+  C1: {
+    name: '손목 젖히기 스트레칭',
+    method: [
+      '팔을 앞으로 뻗고 손바닥이 정면을 보게 손끝을 위로',
+      '반대 손으로 손가락을 몸 쪽으로 지그시 당겨요. 손끝 아래로도 반복',
+    ],
+    duration: '각 15초 × 좌우',
+    source: '미국 산업안전보건청(OSHA)은 반복적인 컴퓨터 작업 중 짧은 휴식과 스트레칭을 권고해요',
+  },
+  C2: {
+    name: '선 채 허리 젖히기',
+    method: ['일어서서 양손을 허리에 대요', '시선은 위로, 허리를 천천히 뒤로 젖혔다 돌아와요'],
+    duration: '5회 반복',
+    source: '미국 산업안전보건청(OSHA)은 장시간 정적 자세 작업 시 자세를 바꾸고 몸을 펴는 휴식을 권고해요',
+  },
+}
+
+/** 동작 목록 화면 하단 고정 고지 (동작 카드 원고 상단 고지문 그대로) */
+export const ACTION_CARDS_DISCLAIMER =
+  '참고용 정보이며 전문의 상담을 대체하지 않아요. 통증이 있다면 무리하지 말고 의료진과 상의하세요.'
 
 export const OVERLAY = {
   ACTION_DONE: '✅ 완료',
@@ -42,6 +129,9 @@ export const OVERLAY = {
    * D2 의 「1분만 같이 세어볼까요?」 제안 단계는 없앴다 — 셀지 말지는 설정에서 정한다.
    */
   COUNTDOWN_STOP: '그만하기',
+
+  /** 스트레칭 로테이션(D2.9) — 방법 전체·출처는 카드에 안 들어간다(540×139). 메인 창 상세로 */
+  ACTION_DETAIL: '자세히',
 
   /** 세션 미시작 리마인더 — 세션당 한 번만 뜬다 */
   IDLE_ICON: '👋',
@@ -61,7 +151,7 @@ export const OVERLAY = {
 export const SETTINGS = {
   TITLE: '설정',
   AUTOSTART_LABEL: '컴퓨터 켤 때 자동으로 시작',
-  AUTOSTART_HINT: '자동 실행 시 창을 띄우지 않고 트레이에만 조용히 상주합니다.',
+  AUTOSTART_HINT: '자동 실행 시 창을 띄우지 않고 백그라운드에서 조용히 실행됩니다.',
   AUTOSTART_ERROR: '자동 실행 설정을 변경하지 못했습니다.',
 
   BEHAVIORS_TITLE: '휴식 루틴',
@@ -96,11 +186,46 @@ export const SETTINGS = {
   SOUND_LABEL: '카드가 뜰 때와 카운트다운이 끝날 때 소리로 알리기',
   SOUND_VOLUME: '볼륨',
   SOUND_PREVIEW: '🔊 미리듣기',
-  SOUND_HINT: '소리는 알림 카드가 냅니다. 창을 닫아 트레이에 있어도 들려요.',
+  SOUND_HINT: '소리는 알림 카드가 냅니다. 창을 닫아 백그라운드에 있어도 들려요.',
 
   IDLE_TITLE: '세션 미시작 알림',
   IDLE_LABEL: '작업 시작을 잊었을 때 한 번 알려주기',
   IDLE_SUFFIX: '분 후',
+
+  /**
+   * 신체정보 (D2.9). 체중 등은 수집하지 않는다 — 성별·연령대만, 그마저도 선택 입력이다
+   * (CLAUDE.md 규칙: 다른 신체정보 수집 금지). 로컬 저장만, 서버로 나가지 않는다.
+   */
+  PROFILE_TITLE: '신체정보',
+  PROFILE_WHY: '왜 필요한가요? 수분 참고 기준이 성별·연령별이라서예요.',
+  PROFILE_SKIP_HINT: '선택 입력이에요. 입력하지 않아도 일반 기준으로 안내해요.',
+  PROFILE_SEX_LABEL: '성별',
+  PROFILE_SEX_MALE: '남성',
+  PROFILE_SEX_FEMALE: '여성',
+  PROFILE_AGE_LABEL: '연령대',
+  PROFILE_AGE_19_29: '19~29세',
+  PROFILE_AGE_30_49: '30~49세',
+  PROFILE_AGE_50_64: '50~64세',
+  PROFILE_AGE_65_PLUS: '65세 이상',
+  PROFILE_UNSET: '입력 안 함',
+
+  /**
+   * 물 참고 기준 (D2.9, 아카이브 §2). "목표" 라는 단어를 쓰지 않는다 — 개인차가 크다는
+   * 아카이브의 결론을 문구에도 반영한 것 (§2-2 표기 규칙).
+   */
+  WATER_TITLE: '물 참고 기준',
+  WATER_ACTIVITY_HINT: '활동이 많거나 더운 날에는 더 필요할 수 있어요.',
+  WATER_DISCLAIMER: '콩팥·심장 질환 등으로 수분 조절이 필요하다면 의료진과 상의하세요.',
+  WATER_SUGGESTION_HINT: '지금 참고 기준으로는 {n}분마다가 어때요? (하루 {hours}시간 근무 기준)',
+  WATER_APPLY_SUGGESTION: '제안 적용',
+  WATER_APPLIED: '적용했어요',
+
+  /** 근거 보기 (D2.9) — 간격이 왜 지금 값인지, 아카이브 §1·§3 의 카피 예시를 그대로 보여준다 */
+  EVIDENCE_ENTRY: '왜 이 주기인가요?',
+  EVIDENCE_TITLE: '왜 이 주기인가요?',
+  EVIDENCE_STRETCH: '스트레칭: 연구는 20~30분대 집중',
+  EVIDENCE_EYES: '눈휴식: 원칙은 20분마다',
+  EVIDENCE_CLOSE: '닫기',
 
   SAVE_ERROR: '설정을 저장하지 못했습니다.',
 } as const
@@ -164,12 +289,20 @@ export const AI = {
 
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D2.8 — 디자인 시스템',
+  PHASE_BADGE: 'Phase D2.9 — 근거 프로토콜 연결',
   DESCRIPTION:
-    '이 창을 닫아도 앱은 종료되지 않고 트레이에 남습니다. 종료는 트레이 메뉴에서만 가능합니다.',
+    '이 창을 닫아도 앱은 종료되지 않고 백그라운드에서 계속 실행됩니다. ' +
+    '완전히 종료하려면 화면 오른쪽 아래 아이콘에서 [완전히 종료]를 눌러주세요.',
   TEST_OVERLAY_BUTTON: '테스트 알림 띄우기',
   OPEN_SETTINGS_BUTTON: '⚙️ 설정',
-  HIDE_BUTTON: '트레이로 숨기기',
+  BACKGROUND_BUTTON: '백그라운드에서 실행',
+
+  /**
+   * 처음으로 창을 숨길 때 한 번만 뜨는 시스템 토스트 안내 (사용자가 직접 쓴 카피, CLAUDE.md 규칙 8 —
+   * 임의 수정 금지). `backgroundNoticeShown` 플래그로 세션이 아니라 설치 전체에서 한 번만 띄운다.
+   */
+  BACKGROUND_NOTICE_TITLE: 'HourStep은 백그라운드에서 계속 실행돼요',
+  BACKGROUND_NOTICE_BODY: '화면 오른쪽 아래 ^ 를 누르면 다시 열 수 있어요',
 
   /** 세션 제어 + 타이머 */
   SESSION_START: '▶ 작업 시작',
@@ -189,4 +322,9 @@ export const MAIN = {
   STATS_EMPTY: '아직 기록이 없어요. [▶ 작업 시작]을 눌러보세요.',
   STATS_SESSION_UNIT: '회',
   STATS_ACTIVE: '세션 진행 중',
+
+  /** 스트레칭 로테이션 상세 (D2.9) — 오버레이 [자세히] 가 여기로 보낸다 */
+  ACTION_DETAIL_DURATION_LABEL: '시간',
+  ACTION_DETAIL_SOURCE_LABEL: '출처',
+  ACTION_DETAIL_CLOSE: '닫기',
 } as const

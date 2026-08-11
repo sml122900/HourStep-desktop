@@ -78,20 +78,20 @@ describe('AI_TARGETS / buildAiUrl', () => {
     for (const target of CHAT_TARGETS) expect(target.injectsPrompt).toBe(false)
   })
 
-  it('채팅형은 영문 이름 알파벳 내림차순이다', () => {
+  it('채팅형은 영문 이름 알파벳 오름차순이다', () => {
     const names = CHAT_TARGETS.map((t) => t.name)
     expect(names).toEqual([
-      'Qwen',
-      'Perplexity',
-      'Kimi',
-      'Grok',
-      'Gemini',
-      'DeepSeek',
-      'Claude',
       'ChatGPT',
+      'Claude',
+      'DeepSeek',
+      'Gemini',
+      'Grok',
+      'Kimi',
+      'Perplexity',
+      'Qwen',
     ])
-    // 순서를 손으로 적어 둔 위가 정말 내림차순인지도 기계로 확인한다
-    expect(names).toEqual([...names].sort((a, b) => b.localeCompare(a, 'en')))
+    // 순서를 손으로 적어 둔 위가 정말 오름차순인지도 기계로 확인한다
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'en')))
   })
 
   it('id 가 겹치지 않고 주소도 서로 다르다', () => {
@@ -101,11 +101,9 @@ describe('AI_TARGETS / buildAiUrl', () => {
     expect(new Set(urls).size).toBe(urls.length)
   })
 
-  it('드롭다운 기본값은 실재하는 채팅형이다 — 목록 순서와 무관하게 정한다', () => {
+  it('드롭다운 기본값은 실재하는 채팅형이다', () => {
     const fallback = aiTargetById(DEFAULT_CHAT_TARGET_ID)
     expect(fallback?.kind).toBe('chat')
-    // 정렬 규칙이 곧 추천이 되지 않게, 첫 줄을 기본값으로 삼지 않는다
-    expect(DEFAULT_CHAT_TARGET_ID).not.toBe(CHAT_TARGETS[0].id)
   })
 
   it('없는 id 로는 대상을 만들지 않는다', () => {

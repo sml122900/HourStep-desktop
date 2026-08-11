@@ -7,6 +7,7 @@ import {
   getCurrentWindow,
   primaryMonitor,
 } from '@tauri-apps/api/window'
+import { actionAt, nextActionIndex } from '../../core/actionRotation'
 import {
   cardMessage,
   intervalMinutes,
@@ -48,6 +49,9 @@ const TOP_GAP = 0
 
 /** 밀린 알림 소진 기준. 이보다 오래된 것은 표시하지 않고 버린다 (절전 복귀 시 카드 폭탄 방지) */
 const STALE_MS = 2 * 60_000
+
+/** 동작 로테이션(D2.9)을 쓰는 유일한 내장 행동. `src/core/presets.ts` 의 id 와 같다 */
+const STRETCH_ROTATION_ID = 'stretch'
 
 /**
  * 카드의 두 모습. D2.6 까지 있던 `offer`(「1분만 같이 세어볼까요?」)는 D2.7 에서 없앴다 —
@@ -279,6 +283,20 @@ export default function OverlayWindow() {
       }
 
       firedRef.current.add(log.occurrenceId)
+
+      // 동작 로테이션(D2.9) — 스트레칭은 발화마다 다음 동작으로 넘어간다. 스누즈해도 다음
+      // 발화(스누즈든 정규든)는 다음 동작을 본다 — 방금 본 걸 그대로 다시 보여주지 않는다.
+      if (current.behavior.id === STRETCH_ROTATION_ID) {
+        const next = nextActionIndex(current.behavior.actionIndex)
+        const behaviors = behaviorsRef.current
+        const idx = behaviors.findIndex((b) => b.id === STRETCH_ROTATION_ID)
+        if (idx >= 0) {
+          behaviorsRef.current = behaviors.map((b, i) => (i === idx ? { ...b, actionIndex: next } : b))
+        }
+        void db.saveActionIndex(STRETCH_ROTATION_ID, next).catch((e) => {
+          console.error('[overlay] 동작 로테이션 저장 실패', e)
+        })
+      }
 
       if (action === 'snoozed') {
         snoozesRef.current.push({
@@ -712,7 +730,10 @@ function BehaviorCard({
   onDismiss: (action: CompletionAction) => void
   onClose: () => void
 }) {
-  const message = cardMessage(behavior)
+  // 스트레칭은 D2.9 부터 정적 message 대신 오늘의 동작(로테이션)을 보여준다.
+  // 카드는 좁아서(540×139) 이름 + 방법 첫 줄까지만 — 전체는 [자세히]가 메인 창으로 보낸다.
+  const rotation = behavior.id === STRETCH_ROTATION_ID ? actionAt(behavior.actionIndex) : null
+  const message = rotation ? rotation.name : cardMessage(behavior)
 
   return (
     <>
@@ -731,6 +752,10 @@ function BehaviorCard({
         </p>
       </div>
 
+      {phase === 'card' && rotation && (
+        <p className="overlay-card__note">{rotation.method[0]}</p>
+      )}
+
       <div className="overlay-card__actions">
         {phase === 'card' ? (
           <>
@@ -741,6 +766,14 @@ function BehaviorCard({
             <Button variant="ghost" onClick={() => onDismiss('skipped')}>
               {OVERLAY.ACTION_SKIP}
             </Button>
+            {rotation && (
+              <Button
+                variant="ghost"
+                onClick={() => void invoke('show_action_detail', { actionId: rotation.id })}
+              >
+                {OVERLAY.ACTION_DETAIL}
+              </Button>
+            )}
           </>
         ) : (
           // 기록은 이미 'done' 으로 남았다. [중단]은 카운트다운만 멈춘다

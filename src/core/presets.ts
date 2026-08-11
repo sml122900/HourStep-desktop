@@ -29,6 +29,8 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     isBuiltin: true,
     source: 'user',
     sortOrder: 0,
+    // 첫 발화부터 A1(로테이션 0번)로 시작한다 (D2.9)
+    actionIndex: 0,
   },
   {
     id: 'water',
@@ -43,6 +45,7 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     isBuiltin: true,
     source: 'user',
     sortOrder: 1,
+    actionIndex: 0, // 물마시기는 로테이션을 쓰지 않는다 — 의미 없는 값
   },
   {
     id: 'eyes',
@@ -57,6 +60,7 @@ export const SEED_BEHAVIORS: readonly Behavior[] = [
     isBuiltin: true,
     source: 'user',
     sortOrder: 2,
+    actionIndex: 0, // 눈휴식도 로테이션을 쓰지 않는다 — 의미 없는 값
   },
 ]
 
