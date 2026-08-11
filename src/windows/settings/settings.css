@@ -132,6 +132,36 @@ body {
   font-size: var(--fs-sm);
 }
 
+/* ─── 동작 목록 (D2.10) — head/method/row/source 는 components.css 의 .action-card__* 공유 ─── */
+
+.action-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+}
+
+.action-prefs__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.action-pref {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.action-pref .action-card__head {
+  justify-content: flex-start;
+  gap: var(--sp-2);
+}
+
 .tag {
   flex: 0 0 auto;
   padding: 0 var(--sp-2);

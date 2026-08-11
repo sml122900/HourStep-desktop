@@ -108,10 +108,23 @@ body,
   padding-left: var(--body-indent);
 }
 
-/* 세션 종료 요약 */
+/* 세션 종료 요약 / 카운트다운 중 시간 안내(D2.10) */
 .overlay-card__note {
   margin: var(--sp-3) 0 0;
   padding-left: var(--body-indent);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+/*
+ * 카운트다운 중 동작 방법 전문(D2.10). 카드는 이 상태에서만 길어진다 — 창은
+ * fitWindow 가 매 phase 전환마다 실측해 다시 맞추므로 여기서 별도 처리가 필요 없다.
+ */
+.overlay-card__method-list {
+  margin: var(--sp-3) 0 0;
+  padding: 0 0 0 var(--body-indent);
+  display: grid;
+  gap: var(--sp-1);
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }

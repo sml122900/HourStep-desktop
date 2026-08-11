@@ -7,6 +7,7 @@
 
 import { emit } from '@tauri-apps/api/event'
 import Database from '@tauri-apps/plugin-sql'
+import { type ActionPref, actionAt, enabledActionIds, normalizeActionPrefs } from '../core/actionRotation'
 import { applyLegacyBehaviorSettings, intervalMinutes, normalizeBehaviors } from '../core/behaviors'
 import { seedBehaviors } from '../core/presets'
 import type { AppSettings } from '../core/settings'
@@ -22,6 +23,8 @@ const SETTINGS_KEY = 'app_settings'
 /** 행동 목록이 바뀌었다. 오버레이·메인 창이 받아서 스케줄과 표시를 다시 만든다. */
 export const BEHAVIORS_CHANGED = 'behaviors://changed'
 export const SETTINGS_CHANGED = 'settings://changed'
+/** D2.10 — 동작 선택이 바뀌었다. 오버레이가 받아서 스트레칭 로테이션에 반영한다. */
+export const ACTION_PREFS_CHANGED = 'action-prefs://changed'
 
 let handle: Promise<Database> | null = null
 
@@ -341,6 +344,44 @@ export async function saveProfile(draft: Profile): Promise<Profile> {
   return profile
 }
 
+// ─── 동작 선택 (D2.10) ──────────────────────────────────────────────────
+
+interface ActionPrefRow {
+  action_id: string
+  enabled: number
+}
+
+/** 스트레칭 로테이션 8종의 켬/끔. 저장된 값을 그대로 믿지 않고 항상 정규화해서 내보낸다. */
+export async function loadActionPrefs(): Promise<ActionPref[]> {
+  const conn = await db()
+  const rows = await conn.select<ActionPrefRow[]>('SELECT action_id, enabled FROM action_prefs')
+  return normalizeActionPrefs(rows.map((r) => ({ id: r.action_id, enabled: r.enabled !== 0 })))
+}
+
+/**
+ * 저장한 뒤 오버레이에 알린다. 오버레이가 이걸 받아 지금 로테이션 순회 대상을 다시 만든다.
+ * 저장이 실패하면 방송하지 않는다 — 화면·DB·로테이션이 갈라지면 안 된다.
+ */
+export async function saveActionPrefsAndBroadcast(draft: ActionPref[]): Promise<ActionPref[]> {
+  const prefs = normalizeActionPrefs(draft)
+  const conn = await db()
+  for (const pref of prefs) {
+    await conn.execute(
+      'INSERT OR REPLACE INTO action_prefs (action_id, enabled) VALUES ($1, $2)',
+      [pref.id, pref.enabled ? 1 : 0]
+    )
+  }
+  await emit(ACTION_PREFS_CHANGED)
+  return prefs
+}
+
+/** `--debug-cmd action-prefs-dump` */
+export async function summarizeActionPrefs(): Promise<string> {
+  const prefs = await loadActionPrefs()
+  const parts = prefs.map((p) => `${p.id}:${p.enabled ? 'on' : 'off'}`)
+  return `action-prefs n=${prefs.length} ${parts.join(' ')}`
+}
+
 // ─── 자동 검증용 ─────────────────────────────────────────────────────────
 
 /** `--debug-cmd db-dump` 이 찍을 한 줄. write→재시작→read 왕복 확인에 쓴다. */
@@ -377,11 +418,16 @@ export async function summarize(): Promise<string> {
 /** `--debug-cmd behaviors-dump` — 스케줄러가 실제로 받는 목록 그대로 찍는다. */
 export async function summarizeBehaviors(): Promise<string> {
   const behaviors = await loadBehaviors()
+  // D2.10 — 저장된 action_index 는 원시값이라 꺼진 동작을 가리킬 수 있다(방금 껐다면).
+  // 실제로 카드에 뜰 동작(actionAt 이 꺼진 것을 건너뛴 결과)을 같이 찍어야 rotation
+  // 스킵이 제대로 먹었는지 --debug-cmd 만으로 확인할 수 있다.
+  const enabled = enabledActionIds(await loadActionPrefs())
   const parts = behaviors.map(
     (b) =>
       `${b.sortOrder}:${b.id}(${b.emoji}${b.label},${intervalMinutes(b)}m,${b.durationSec}s,` +
       `${b.enabled ? 'on' : 'off'}${b.isBuiltin ? ',builtin' : ''}` +
-      `${b.source === 'ai' ? ',ai' : ''},action=${b.actionIndex})`
+      `${b.source === 'ai' ? ',ai' : ''},action=${b.actionIndex}` +
+      `${b.id === 'stretch' ? `,shown=${actionAt(b.actionIndex, enabled).id}` : ''})`
   )
   return `behaviors n=${behaviors.length} ${parts.join(' ')}`
 }

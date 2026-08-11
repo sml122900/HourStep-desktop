@@ -7,7 +7,14 @@ import {
   getCurrentWindow,
   primaryMonitor,
 } from '@tauri-apps/api/window'
-import { actionAt, nextActionIndex } from '../../core/actionRotation'
+import {
+  type ActionPref,
+  actionAt,
+  canDisable,
+  enabledActionIds,
+  nextActionIndex,
+  normalizeActionPrefs,
+} from '../../core/actionRotation'
 import {
   cardMessage,
   intervalMinutes,
@@ -32,7 +39,7 @@ import type {
 } from '../../core/types'
 import * as db from '../../data/db'
 import { formatDuration, formatRate } from '../../data/range'
-import { OVERLAY } from '../../constants/strings'
+import { EYE_REST_DURATION, EYE_REST_METHOD, OVERLAY } from '../../constants/strings'
 import Button from '../../components/Button'
 import { playCue } from '../sound'
 
@@ -166,6 +173,31 @@ async function debugBehavior(spec: string): Promise<void> {
   }
 }
 
+/**
+ * `--debug-cmd action-toggle:<id>=<on|off>` — 설정 창 체크박스와 같은 함수(`saveActionPrefsAndBroadcast`)
+ * 를 탄다. 최소 1개 강제(`canDisable`)도 설정 창과 똑같이 지킨다 — 그래야 "마지막 하나는
+ * 못 끈다"를 클릭 없이 검증할 수 있다.
+ */
+async function debugActionPref(spec: string): Promise<void> {
+  const [id, onoff] = spec.split('=')
+  const enabled = onoff !== 'off'
+  try {
+    const current = await db.loadActionPrefs()
+    if (!enabled && !canDisable(current, id)) {
+      await invoke('log_debug', { line: `action-prefs toggle ${id}=off 거부 (최소 1개)` })
+      return
+    }
+    const saved = await db.saveActionPrefsAndBroadcast(
+      current.map((p) => (p.id === id ? { ...p, enabled } : p))
+    )
+    await invoke('log_debug', {
+      line: `action-prefs toggle n=${saved.length} ${saved.map((p) => `${p.id}:${p.enabled ? 'on' : 'off'}`).join(' ')}`,
+    })
+  } catch (e) {
+    await invoke('log_debug', { line: `action-toggle ${spec} 실패: ${e}` })
+  }
+}
+
 export default function OverlayWindow() {
   const [active, setActiveState] = useState<Active | null>(null)
   const [phase, setPhase] = useState<Phase>('card')
@@ -189,6 +221,8 @@ export default function OverlayWindow() {
    * (그 사이 tick 이 와도 엉뚱한 카드가 뜨지 않게 값이 비어 있지 않아야 한다).
    */
   const behaviorsRef = useRef<Behavior[]>(seedBehaviors())
+  /** 동작 선택(D2.10) — 로드 전 기본값은 8종 전부 켬(normalizeActionPrefs([])) */
+  const actionPrefsRef = useRef<ActionPref[]>(normalizeActionPrefs([]))
   const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS)
   /** Rust tick 이 준 마지막 "지금". 가상 시각(`--debug-cmd tick:`)이 반영돼 있다. */
   const nowRef = useRef<number>(0)
@@ -287,7 +321,7 @@ export default function OverlayWindow() {
       // 동작 로테이션(D2.9) — 스트레칭은 발화마다 다음 동작으로 넘어간다. 스누즈해도 다음
       // 발화(스누즈든 정규든)는 다음 동작을 본다 — 방금 본 걸 그대로 다시 보여주지 않는다.
       if (current.behavior.id === STRETCH_ROTATION_ID) {
-        const next = nextActionIndex(current.behavior.actionIndex)
+        const next = nextActionIndex(current.behavior.actionIndex, enabledActionIds(actionPrefsRef.current))
         const behaviors = behaviorsRef.current
         const idx = behaviors.findIndex((b) => b.id === STRETCH_ROTATION_ID)
         if (idx >= 0) {
@@ -410,6 +444,15 @@ export default function OverlayWindow() {
     console.log(
       '[overlay] 행동 반영',
       behaviorsRef.current.map((b) => `${b.id}:${intervalMinutes(b)}m:${b.enabled ? 'on' : 'off'}`)
+    )
+  }, [])
+
+  /** 동작 선택(D2.10)을 다시 읽는다. 다음 로테이션 판단부터 바로 반영된다. */
+  const reloadActionPrefs = useCallback(async () => {
+    actionPrefsRef.current = await db.loadActionPrefs()
+    console.log(
+      '[overlay] 동작 선택 반영',
+      actionPrefsRef.current.map((p) => `${p.id}:${p.enabled ? 'on' : 'off'}`)
     )
   }, [])
 
@@ -566,6 +609,7 @@ export default function OverlayWindow() {
       ),
       listen(db.SETTINGS_CHANGED, () => void reloadSettings()),
       listen(db.BEHAVIORS_CHANGED, () => void reloadBehaviors()),
+      listen(db.ACTION_PREFS_CHANGED, () => void reloadActionPrefs()),
       // 트레이 [테스트 알림] — 스케줄과 무관하게 한 장 띄운다
       listen<string>('overlay://show', (e) => {
         const behavior =
@@ -597,6 +641,15 @@ export default function OverlayWindow() {
       }),
       // `--debug-cmd behavior-add / behavior-delete / behavior-restore / set-interval / set-duration`
       listen<string>('overlay://debug-behavior', (e) => void debugBehavior(e.payload)),
+      // `--debug-cmd action-toggle:<id>=<on|off>`
+      listen<string>('overlay://debug-action-prefs', (e) => void debugActionPref(e.payload)),
+      // `--debug-cmd action-prefs-dump`
+      listen('overlay://debug-action-prefs-dump', () => {
+        void db
+          .summarizeActionPrefs()
+          .then((line) => invoke('log_debug', { line }))
+          .catch((e) => invoke('log_debug', { line: `action-prefs-dump 실패: ${e}` }))
+      }),
       // `--debug-cmd queue-dump` — 지금 대기 중인 발화. 큐 적재가 눈에 보이는 유일한 창구다
       listen('overlay://debug-queue-dump', () => {
         void invoke('log_debug', { line: summarizeQueue(queueRef.current) })
@@ -649,7 +702,7 @@ export default function OverlayWindow() {
       }
 
       try {
-        await Promise.all([reloadSettings(), reloadBehaviors()])
+        await Promise.all([reloadSettings(), reloadBehaviors(), reloadActionPrefs()])
       } catch (e) {
         console.error('[overlay] 설정·행동 로드 실패', e)
       }
@@ -661,7 +714,16 @@ export default function OverlayWindow() {
     return () => {
       unlisteners.forEach((p) => void p.then((fn) => fn()))
     }
-  }, [onTick, applySession, openCard, dismiss, hide, reloadSettings, reloadBehaviors])
+  }, [
+    onTick,
+    applySession,
+    openCard,
+    dismiss,
+    hide,
+    reloadSettings,
+    reloadBehaviors,
+    reloadActionPrefs,
+  ])
 
   const seconds = Math.ceil(remainingMs / 1000)
 
@@ -679,6 +741,7 @@ export default function OverlayWindow() {
               behavior={active.behavior}
               phase={phase}
               seconds={seconds}
+              enabledIds={enabledActionIds(actionPrefsRef.current)}
               onDismiss={dismiss}
               onClose={hide}
             />
@@ -721,19 +784,30 @@ function BehaviorCard({
   behavior,
   phase,
   seconds,
+  enabledIds,
   onDismiss,
   onClose,
 }: {
   behavior: Behavior
   phase: Phase
   seconds: number
+  enabledIds: Set<string>
   onDismiss: (action: CompletionAction) => void
   onClose: () => void
 }) {
   // 스트레칭은 D2.9 부터 정적 message 대신 오늘의 동작(로테이션)을 보여준다.
   // 카드는 좁아서(540×139) 이름 + 방법 첫 줄까지만 — 전체는 [자세히]가 메인 창으로 보낸다.
-  const rotation = behavior.id === STRETCH_ROTATION_ID ? actionAt(behavior.actionIndex) : null
+  // D2.10: 꺼진 동작은 건너뛴다 — 지금 위치가 방금 꺼졌어도 actionAt 이 다음 켜진 것으로 민다.
+  const rotation =
+    behavior.id === STRETCH_ROTATION_ID ? actionAt(behavior.actionIndex, enabledIds) : null
   const message = rotation ? rotation.name : cardMessage(behavior)
+
+  // D2.10 — 카운트다운 중에는 방법 전문 + 시간을 보여준다. 눈휴식(D1)은 로테이션이
+  // 없는 단일 동작이라 고정 원고(EYE_REST_*)를 쓴다. 물(duration 0)은 이 phase 에 안 온다.
+  const countdownMethod: readonly string[] | null =
+    phase !== 'counting' ? null : rotation ? rotation.method : behavior.id === 'eyes' ? EYE_REST_METHOD : null
+  const countdownDuration: string | null =
+    phase !== 'counting' ? null : rotation ? rotation.duration : behavior.id === 'eyes' ? EYE_REST_DURATION : null
 
   return (
     <>
@@ -755,6 +829,15 @@ function BehaviorCard({
       {phase === 'card' && rotation && (
         <p className="overlay-card__note">{rotation.method[0]}</p>
       )}
+
+      {countdownMethod && (
+        <ul className="overlay-card__method-list">
+          {countdownMethod.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      )}
+      {countdownDuration && <p className="overlay-card__note">{countdownDuration}</p>}
 
       <div className="overlay-card__actions">
         {phase === 'card' ? (

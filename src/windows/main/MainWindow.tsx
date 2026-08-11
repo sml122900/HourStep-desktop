@@ -306,22 +306,22 @@ export default function MainWindow() {
 function ActionDetailCard({ action, onClose }: { action: ActionCard; onClose: () => void }) {
   return (
     <Card as="section" className="action-detail">
-      <div className="action-detail__head">
+      <div className="action-card__head">
         <h2>{action.name}</h2>
         <Button size="sm" variant="ghost" onClick={onClose}>
           {MAIN.ACTION_DETAIL_CLOSE}
         </Button>
       </div>
-      <ul className="action-detail__method">
+      <ul className="action-card__method">
         {action.method.map((line, i) => (
           <li key={i}>{line}</li>
         ))}
       </ul>
-      <p className="action-detail__row">
+      <p className="action-card__row">
         <span>{MAIN.ACTION_DETAIL_DURATION_LABEL}</span>
         <strong>{action.duration}</strong>
       </p>
-      <p className="action-detail__source">
+      <p className="action-card__source">
         {MAIN.ACTION_DETAIL_SOURCE_LABEL}: {action.source}
       </p>
     </Card>

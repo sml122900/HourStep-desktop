@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
+import { type ActionPref, canDisable } from '../../core/actionRotation'
 import {
   MAX_BEHAVIORS,
   MAX_DURATION_SEC,
@@ -40,7 +41,7 @@ import {
   waterReference,
 } from '../../core/waterGoal'
 import * as db from '../../data/db'
-import { ACTION_CARDS_DISCLAIMER, AI, SETTINGS } from '../../constants/strings'
+import { ACTION_CARDS, ACTION_CARDS_DISCLAIMER, AI, SETTINGS } from '../../constants/strings'
 import Button from '../../components/Button'
 import Card from '../../components/Card'
 import Checkbox from '../../components/Checkbox'
@@ -78,7 +79,9 @@ export default function SettingsWindow() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [behaviors, setBehaviors] = useState<Behavior[] | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [actionPrefs, setActionPrefs] = useState<ActionPref[] | null>(null)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   /**
@@ -108,6 +111,13 @@ export default function SettingsWindow() {
       .then(setProfile)
       .catch((e) => {
         console.error('[settings] 신체정보 로드 실패', e)
+        setError(SETTINGS.SAVE_ERROR)
+      })
+
+    db.loadActionPrefs()
+      .then(setActionPrefs)
+      .catch((e) => {
+        console.error('[settings] 동작 선택 로드 실패', e)
         setError(SETTINGS.SAVE_ERROR)
       })
   }, [])
@@ -158,6 +168,21 @@ export default function SettingsWindow() {
       console.error('[settings] 신체정보 저장 실패', e)
       setError(SETTINGS.SAVE_ERROR)
       setProfile(await db.loadProfile().catch(() => null))
+    }
+  }, [])
+
+  /**
+   * 동작 선택 저장(D2.10). 체크박스 클릭은 신체정보와 같은 성격 — 글자 입력이 아니라
+   * 즉시 확정되는 선택이라 커밋 시점을 따로 둘 이유가 없다.
+   */
+  const persistActionPrefs = useCallback(async (draft: ActionPref[]) => {
+    setError(null)
+    try {
+      setActionPrefs(await db.saveActionPrefsAndBroadcast(draft))
+    } catch (e) {
+      console.error('[settings] 동작 선택 저장 실패', e)
+      setError(SETTINGS.SAVE_ERROR)
+      setActionPrefs(await db.loadActionPrefs().catch(() => null))
     }
   }, [])
 
@@ -227,6 +252,7 @@ export default function SettingsWindow() {
     const unlisteners = [
       listen(db.SETTINGS_CHANGED, () => document.hidden && reload()),
       listen(db.BEHAVIORS_CHANGED, () => document.hidden && reload()),
+      listen(db.ACTION_PREFS_CHANGED, () => document.hidden && reload()),
     ]
 
     return () => {
@@ -428,6 +454,57 @@ export default function SettingsWindow() {
             <p>{SETTINGS.EVIDENCE_STRETCH}</p>
             <p>{SETTINGS.EVIDENCE_EYES}</p>
             <p className="hint">{ACTION_CARDS_DISCLAIMER}</p>
+          </div>
+        )}
+
+        {/* 동작 목록 (D2.10) — 스트레칭 카드가 로테이션으로 보여줄 8종 중 뭘 켤지 고른다 */}
+        <Button size="sm" variant="ghost" onClick={() => setActionsOpen((v) => !v)}>
+          {SETTINGS.ACTIONS_ENTRY}
+        </Button>
+        {actionsOpen && (
+          <div className="action-prefs">
+            <p className="hint">{ACTION_CARDS_DISCLAIMER}</p>
+            <ul className="action-prefs__list">
+              {Object.entries(ACTION_CARDS).map(([id, action]) => {
+                const checked = actionPrefs?.find((p) => p.id === id)?.enabled ?? true
+                const blocked = checked && actionPrefs !== null && !canDisable(actionPrefs, id)
+                return (
+                  <Card key={id} as="li" variant="row" className="action-pref">
+                    <div className="action-card__head">
+                      <Checkbox
+                        checked={checked}
+                        disabled={actionPrefs === null || blocked}
+                        ariaLabel={action.name}
+                        onChange={(next) =>
+                          actionPrefs &&
+                          void persistActionPrefs(
+                            actionPrefs.map((p) => (p.id === id ? { ...p, enabled: next } : p))
+                          )
+                        }
+                      />
+                      <strong>{action.name}</strong>
+                      {blocked && (
+                        <span className="tag" title={SETTINGS.ACTIONS_MIN_ONE_HINT}>
+                          {SETTINGS.ACTIONS_MIN_ONE_HINT}
+                        </span>
+                      )}
+                    </div>
+                    <ul className="action-card__method">
+                      {action.method.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                    <p className="action-card__row">
+                      <span>{SETTINGS.ACTIONS_DURATION_LABEL}</span>
+                      <strong>{action.duration}</strong>
+                    </p>
+                    <p className="action-card__source">
+                      {SETTINGS.ACTIONS_SOURCE_LABEL}: {action.source}
+                    </p>
+                  </Card>
+                )
+              })}
+            </ul>
           </div>
         )}
       </Section>

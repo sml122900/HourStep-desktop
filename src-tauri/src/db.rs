@@ -129,5 +129,22 @@ pub fn migrations() -> Vec<Migration> {
             ALTER TABLE behaviors ADD COLUMN action_index INTEGER NOT NULL DEFAULT 0;
         ",
     },
+    // D2.10 — 동작 선택. 스트레칭 로테이션 8종(A1,A2,B1~B4,C1,C2) 중 일부를 끌 수 있다.
+    // 전부 켠 상태로 시드해서 기존 사용자는 동작 변화가 없다(로테이션 인덱스도 그대로 보존된다 —
+    // 이 표는 `behaviors.action_index` 와 별개라 마이그레이션이 그 값을 건드리지 않는다).
+    // id 는 `src/core/actionRotation.ts` 의 `ROTATION_ORDER` 와 반드시 같아야 한다.
+    Migration {
+        version: 6,
+        description: "action_prefs",
+        kind: MigrationKind::Up,
+        sql: "
+            CREATE TABLE IF NOT EXISTS action_prefs (
+                action_id TEXT PRIMARY KEY,
+                enabled   INTEGER NOT NULL DEFAULT 1
+            );
+            INSERT OR IGNORE INTO action_prefs (action_id, enabled) VALUES
+                ('A1', 1), ('A2', 1), ('B1', 1), ('B2', 1), ('B3', 1), ('B4', 1), ('C1', 1), ('C2', 1);
+        ",
+    },
     ]
 }

@@ -120,6 +120,17 @@ export const ACTION_CARDS: Record<
 export const ACTION_CARDS_DISCLAIMER =
   '참고용 정보이며 전문의 상담을 대체하지 않아요. 통증이 있다면 무리하지 말고 의료진과 상의하세요.'
 
+/**
+ * D1(눈) 원고 — 스트레칭(ACTION_CARDS)과 달리 로테이션이 없는 단일 동작이라 별도로 둔다.
+ * `BEHAVIOR_MESSAGE.eyes` 는 이 method 의 첫 줄과 같다(카드는 한 줄만 보여준다).
+ * 카운트다운 중 안내(D2.10)가 전체를 보여준다. 원고 임의 수정 금지(CLAUDE.md 규칙 8).
+ */
+export const EYE_REST_METHOD: readonly string[] = [
+  '창밖이나 방에서 가장 먼 곳을 바라봐요 (6m 이상이면 좋아요)',
+  '그동안 눈을 천천히 여러 번 깜빡여요 — 화면을 볼 땐 깜빡임이 줄어들어요',
+]
+export const EYE_REST_DURATION = '20초 이상, 여유 있으면 1분'
+
 export const OVERLAY = {
   ACTION_DONE: '✅ 완료',
   ACTION_SNOOZE: '⏰ 3분 뒤',
@@ -227,6 +238,15 @@ export const SETTINGS = {
   EVIDENCE_EYES: '눈휴식: 원칙은 20분마다',
   EVIDENCE_CLOSE: '닫기',
 
+  /**
+   * 동작 목록 화면 (D2.10) — 스트레칭 로테이션 8종 중 어떤 걸 오늘의 동작으로 쓸지 고른다.
+   * 최소 1개는 항상 켜져 있어야 한다 — 다 끄면 스트레칭 카드가 보여줄 동작이 없어진다.
+   */
+  ACTIONS_ENTRY: '동작 목록 보기',
+  ACTIONS_DURATION_LABEL: '시간',
+  ACTIONS_SOURCE_LABEL: '출처',
+  ACTIONS_MIN_ONE_HINT: '최소 1개는 켜져 있어야 해요',
+
   SAVE_ERROR: '설정을 저장하지 못했습니다.',
 } as const
 
@@ -289,7 +309,7 @@ export const AI = {
 
 export const MAIN = {
   TITLE: 'HourStep Desktop',
-  PHASE_BADGE: 'Phase D2.9 — 근거 프로토콜 연결',
+  PHASE_BADGE: 'Phase D2.10 — 동작 목록·선택 + 카운트다운 안내',
   DESCRIPTION:
     '이 창을 닫아도 앱은 종료되지 않고 백그라운드에서 계속 실행됩니다. ' +
     '완전히 종료하려면 화면 오른쪽 아래 아이콘에서 [완전히 종료]를 눌러주세요.',

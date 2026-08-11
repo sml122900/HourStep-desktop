@@ -180,6 +180,47 @@
   text-transform: uppercase;
 }
 
+/* ─────────────────  동작 카드 상세 (방법·시간·출처, D2.9/D2.10)  ───────────────── */
+/* 메인 창의 오버레이 [자세히]와 설정 창의 동작 목록이 함께 쓴다 — 창이 달라 CSS 파일이
+   나뉘어 있지만(창별 엔트리) 내용 구조는 같으므로 여기 한 곳에 정의한다. */
+
+.action-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.action-card__head h2,
+.action-card__head strong {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+}
+
+.action-card__method {
+  margin: 0;
+  padding-left: var(--sp-4);
+  display: grid;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+}
+
+.action-card__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.action-card__source {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+}
+
 /* ──────────────────  텍스트 유틸 (EmptyState / hint / error)  ────────────────── */
 
 /* 보여줄 게 없을 때. 자리를 비워 두지 않고 왜 비었는지 한 줄로 말한다 */

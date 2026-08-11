@@ -24,6 +24,9 @@
 //!
 //! # D2.7 카운트다운 + 발화 큐: 카드 → 완료(카운트다운 시작) → 그 사이 다른 행동 도래 → 큐 → 자동 이어 표시
 //! pnpm tauri dev -- -- -- --debug-cmd "wait:5000,behavior-add:q1=3,behavior-add:q2=4,set-duration:q1=8,start-session,wait:1500,tick:180000,wait:2500,dump,done,wait:1000,tick:60000,wait:2000,queue-dump,wait:9000,dump,queue-dump,quit"
+//!
+//! # D2.10 동작 선택: A1 을 끄면 로테이션이 B1 부터 도는지, 카운트다운 중 창이 커졌다 원복하는지
+//! pnpm tauri dev -- -- -- --debug-cmd "wait:4000,action-toggle:A1=off,wait:1000,action-prefs-dump,start-session,wait:1500,dump,overlay-show:stretch,wait:1500,dump,done,wait:1500,dump,queue-dump,wait:9000,dump,quit"
 //! ```
 //!
 //! 한계: 이 훅은 **자기 프로세스 안에서만** 동작한다. 이미 떠 있는 다른 인스턴스에는 명령을
@@ -230,6 +233,15 @@ fn run_step(app: &AppHandle, step: &str) {
             None => eprintln!("[debug-cmd] set-theme 은 'light|dark|system' 이 필요합니다"),
         },
 
+        // D2.10 — `action-toggle:A1=off` — 설정 창의 동작 목록 체크박스와 같은 경로.
+        // 최소 1개 강제도 같은 함수(canDisable)로 지킨다.
+        "action-toggle" => match arg {
+            Some(spec) => ask_overlay(app, "overlay://debug-action-prefs", spec.to_string()),
+            None => eprintln!("[debug-cmd] action-toggle 은 '<id>=<on|off>' 형식이 필요합니다"),
+        },
+        // 지금 켬/끔 상태. `[debug] action-prefs n=8 A1:on B1:off …`
+        "action-prefs-dump" => ask_overlay(app, "overlay://debug-action-prefs-dump", ()),
+
         // 트레이 [종료] 와 같은 경로
         "quit" => {
             println!("[debug-cmd] quit — 트레이 [종료] 와 동일 경로");
@@ -267,4 +279,22 @@ fn dump(app: &AppHandle) {
         overlay::OVERLAY_LABEL,
         overlay::is_visible(app)
     );
+
+    // D2.10 — 카운트다운 진입 시 창이 실제로 커지고(방법 전문이 늘어난 만큼) 끝나면
+    // 원복하는지 확인하는 창구. show/hide 를 raw Win32 로 하는 것과 별개로 outer_size/
+    // outer_position 은 일반 Tauri API 라 시각 상태와 무관하게 항상 실제 rect 를 준다.
+    match app.get_webview_window(overlay::OVERLAY_LABEL) {
+        Some(window) => match (window.outer_size(), window.outer_position()) {
+            (Ok(size), Ok(pos)) => println!(
+                "[debug-cmd] dump {}.rect={}x{}+{}+{}",
+                overlay::OVERLAY_LABEL,
+                size.width,
+                size.height,
+                pos.x,
+                pos.y
+            ),
+            _ => println!("[debug-cmd] dump {}.rect=오류", overlay::OVERLAY_LABEL),
+        },
+        None => println!("[debug-cmd] dump {}.rect=없음", overlay::OVERLAY_LABEL),
+    }
 }
