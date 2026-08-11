@@ -41,7 +41,8 @@ Behavior {
   durationSec: number,                                        // 행위 시간. 0=즉시 행동, >0=[완료]가 카운트다운 시작
   isBuiltin: boolean,                                         // 기본 3종 표시 (근거 프로토콜 자리)
   source: 'user' | 'ai',                                      // 문구 출처. 'ai' 는 D2.6 브리지로 가져온 것
-  sortOrder: number                                           // 목록 순서, 0부터 연속
+  sortOrder: number,                                          // 목록 순서, 0부터 연속
+  actionIndex: number                                         // 동작 로테이션 마지막 인덱스. stretch만 씀 (D2.9)
 }
 RoutineItem { emoji, label, minutes, message }                 // 파서 출력 — 아직 행동이 아니다
 Occurrence { behaviorId, dueAt, origin: 'regular' | 'snooze' }  // 스케줄러 출력
@@ -68,6 +69,8 @@ CompletionLog {
 D2.5 부터 이건 **최초 시드이자 「기본값 복원」의 기준값**일 뿐이다. 런타임 행동 목록은
 DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·정렬한다 (`docs/decisions/0007`).
 `is_builtin` 은 향후 근거 기반 프로토콜을 붙일 자리 표시 — 실존 출처 전까지 인용 금지(규칙 6).
+D2.9 부터 스트레칭·눈휴식·물마시기 세 종에 실제 출처가 붙었다 (`docs/decisions/0012`,
+`docs/content/hourstep-evidence-archive.md`).
 
 ## Phase 로드맵
 - **D0 (완료)**: 스캐폴딩 + 트레이 상주 + 자동실행 + 오버레이 스파이크
@@ -83,6 +86,10 @@ DB(`behaviors` 테이블)가 소유하고 사용자가 추가·편집·삭제·�
   + 발화 큐 (`docs/decisions/0009`)
 - **D2.8 (완료)**: 디자인 시스템 — 토큰 정의 + 공통 컴포넌트 + 4화면 정렬.
   새 기능 없음. 규격은 `docs/design-system.md`
+- **D2.9 (완료)**: 근거 프로토콜 연결(마이그레이션 v5) — 신체정보(성별·연령대, 선택 입력,
+  별도 `profile` 테이블) + 물 참고 기준·간격 제안(`src/core/waterGoal.ts`) + 스트레칭
+  동작 로테이션(`src/core/actionRotation.ts`, 상태는 `behaviors.action_index`) +
+  눈·물 카드 문구를 원고로 교체 + 근거 보기 화면. 근거 `docs/decisions/0012`
 - **D3**: 풀스크린 앱 감지 억제, 다중 모니터, NSIS 인스톨러, 브랜딩
 - 이후(비전): Supabase 동기화 → 모바일과 통합 통계, AI 루틴 생성/코칭
 
@@ -176,10 +183,20 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
 의 가상 시각과 갈라져 "표시값 = 실제 발화"를 검증할 수 없다. 숨은 창은 `document.hidden`
 으로 렌더만 건너뛴다.
 
+⚠️ **`document.hidden`/`visibilitychange` 는 "안 보인다"는 신뢰할 근거가 못 될 때가 있다.**
+D2.8 후속(2026-08-11) 에서 실측: 메인 창을 `windows::hide_main`(Tauri 공식 `window.hide()`)
+으로 숨겨도 `visibilitychange` 가 5초 넘게 안 온 사례가 있었다(오버레이가 raw Win32 로
+숨어서 `WebviewWindow::is_visible()` 이 어긋나는 것, `docs/decisions/0001`, 과 같은 결의
+WebView2 문제). 위 tick 스킵처럼 **틀려도 그냥 매초 다시 그리기만 하는 자리**라면 조용히
+넘어갈 수 있지만, "숨었다는 사실 자체"가 로직을 좌우하는 자리(예: 창이 처음 숨겨질 때
+한 번만 안내)라면 Page Visibility 를 믿지 말고 **Rust 가 명시적으로 이벤트를 쏘게** 한다
+(`windows::MAIN_HIDDEN_EVENT` = `main://hidden`).
+
 ### 저장소
 `%APPDATA%\com.hourstep.desktop\hourstep.db` (SQLite, WAL). 스키마·마이그레이션은
 `src-tauri/src/db.rs` 가 소유하고, **읽기/쓰기는 `src/data/db.ts` 어댑터만** 한다.
-현재 마이그레이션 v4 (`work_sessions` / `completion_logs` / `settings` / `behaviors`).
+현재 마이그레이션 v5 (`work_sessions` / `completion_logs` / `settings` / `behaviors` /
+`profile`).
 행동 아닌 설정은 `settings` 테이블에 JSON 한 덩어리 (근거: `docs/decisions/0003`),
 행동은 `behaviors` 테이블 (근거: `docs/decisions/0007`).
 - 저장된 값을 그대로 믿지 않는다 — `normalizeSettings()` / `normalizeBehaviors()` 로
@@ -192,6 +209,12 @@ tick 은 D2.5 부터 **모든 창**으로 간다. 메인 창의 경과시간·�
   `docs/decisions/0008` — 한 열에 두 의미를 태우면 둘 중 하나는 어긋난다
 - `behaviors.duration_sec` (v4) 가 행위 시간이다. v3 의 `countdown_ms` 값을 흡수했고
   그 열은 **아무도 읽지 않는 채 남아 있다** (SQLite DROP COLUMN 이 버전을 타서 안 지웠다)
+- `behaviors.action_index` (v5) 는 동작 로테이션의 마지막 인덱스다. 지금은 스트레칭만
+  쓴다. `saveActionIndex()` 로 그 값만 조용히 쓴다 — 전체 저장 경로
+  (`saveBehaviorsAndBroadcast`)를 타면 다른 창에 불필요한 방송이 나간다 (`docs/decisions/0012`)
+- `profile` (v5) 은 신체정보(성별·연령대) 싱글턴 행. `settings` 블롭에 얹지 않은 이유도
+  `docs/decisions/0012` — 개인 정보라 성격이 다르고, 향후 계정 동기화에서 열 단위로
+  다룰 가능성이 크다
 - 앱이 강제 종료되면 `ended_at IS NULL` 세션이 남는다. 기동 시 `closeDanglingSessions(bootedAt)`
   가 **마지막 기록 시각**으로 닫는다. `bootedAt` 인자는 필수 — 없으면 기동 직후 시작한
   살아 있는 세션까지 닫아버린다

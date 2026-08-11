@@ -4,13 +4,18 @@
 > 작업을 이어갈 때 가장 먼저 읽고, 작업이 끝나면 여기부터 갱신한다.
 > 배경·규칙은 `CLAUDE.md`, 상세 기록은 `docs/daily/`·`docs/decisions/`.
 
-**마지막 갱신: 2026-08-09** · **현재 Phase: D2.8 완료(자동 검증까지) → 다음 D3**
-**설치본: 0.3.0** (`%LOCALAPPDATA%\HourStep`, NSIS per-user) — 2026-08-09 22:59 설치 완료.
-D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 가 기존 DB 에 적용됐고
-행동·기록·설정은 그대로다. 설치 직전 DB 사본: `…/scratchpad/db-backup-pre-0.3.0-install/`.
+**마지막 갱신: 2026-08-11** · **현재 Phase: D2.9 완료(자동 검증까지) → 다음 D3**
+**설치본: 0.4.0** (`%LOCALAPPDATA%\HourStep`, NSIS per-user, `/S` 무인 설치) —
+2026-08-11 23:02 설치 완료. D2.9(신체정보·물 참고 기준·동작 로테이션·근거 보기,
+마이그레이션 v5)까지 들어간 빌드다. dev 로 먼저 v5 를 이 DB 에 적용해 뒀던 상태라
+설치본이 켜져도 마이그레이션은 이미 끝나 있다(멱등). 설치 직전 DB 사본은 안 떴다 —
+0.3.0 설치 때 사본(`…/scratchpad/db-backup-pre-0.3.0-install/`) 이후 DB 는 dev 로만
+바뀌었고 D2.9 검증이 세션·기록을 만들지 않았음을 이미 대조 확인했다.
 ⚠️ dev 와 설치본이 **같은 DB**(`%APPDATA%\com.hourstep.desktop\hourstep.db`)를 쓴다 —
 `--debug-cmd` 검증은 사용자 데이터를 바꾼다. 실제로 설정을 날린 적이 있다:
-`docs/troubleshooting/dev-and-installed-share-db.md`
+`docs/troubleshooting/dev-and-installed-share-db.md`. 2026-08-11 검증(D2.9) 은 실 DB 에
+`sessions=11 logs=54 behaviors=3` 그대로임을 전후 대조로 확인했고 세션·기록은 만들지
+않았다 — 상세는 `docs/daily/2026-08-11-phase-d2.9.md`
 
 ---
 
@@ -95,12 +100,53 @@ D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 �
   **동작 변화는 없다** — 리마인더칸은 D2.8(`2eb8576`)에 이미 고쳐져 있었다.
   근거 `docs/decisions/0011`, 진단 기록
   `docs/troubleshooting/fixed-bug-reported-again-version-skew.md`
+- **D2.8 후속 3 (2026-08-11)** — 채팅형 AI 드롭다운 정렬을 내림차순 → **오름차순**으로.
+  드롭다운 기본값(ChatGPT)이 정렬 순서상 첫 줄과 겹치게 돼서, "첫 줄을 기본값으로 쓰지
+  않는다"던 규칙은 없앴다(기본값은 그대로 ChatGPT — 가장 널리 쓰이는 채팅형이라는 이유로).
+  vitest 갱신, 회귀 없음
+- **D2.8 후속 4 (2026-08-11)** — "트레이" 용어를 사용자 노출 문구에서 전부 제거하고
+  "백그라운드에서 실행"으로 바꿨다. 코드·문서 내부 용어로는 유지(규칙 그대로).
+  - 트레이 메뉴 "종료" → "완전히 종료" (숨김과 구분)
+  - 창을 **처음** 숨길 때(X 닫기·헤더의 [백그라운드에서 실행] 버튼 공통 — 둘 다 Rust 의
+    `windows::hide_main` 한 곳으로 모여 `main://hidden` 이벤트를 낸다) Windows 시스템
+    토스트로 한 번만 안내(`backgroundNoticeShown` 플래그, `@tauri-apps/plugin-notification`
+    신규 의존성). **실측으로 알아낸 것**: WebView2 는 `window.hide()` 로 숨겨도
+    `document.hidden`/`visibilitychange` 를 신뢰성 있게 주지 않는다 — 그래서 Page
+    Visibility 대신 Rust 가 명시적으로 이벤트를 쏜다
+  - [백그라운드에서 실행] 버튼을 하단에서 헤더(설정 버튼 왼쪽)로 옮기고 크기를 키웠다
+  - `--debug-cmd main-hide` 를 같은 경로(`windows::hide_main`)를 타도록 바꿔서, 닫기
+    2회 → 안내 로그 1회만(`background-notice granted=…`)을 실 DB 에서 검증. 세션·기록은
+    만들지 않았다(db-dump 전후 동일)
+- **D2.9 (2026-08-11)** — 근거 프로토콜 연결. 마이그레이션 v5. 일지
+  `docs/daily/2026-08-11-phase-d2.9.md`, 근거 `docs/decisions/0012`
+  - **신체정보**(성별·연령대, 둘 다 선택 입력) — 새 `profile` 싱글턴 테이블. 체중 등은
+    수집하지 않는다
+  - **물 참고 기준** — `src/core/waterGoal.ts`. KDRIs 2020 확정치가 있는 2조합만 mL 병기,
+    나머지는 "하루 5~6잔(200mL 기준)" 단순화. `suggestWaterInterval()` 로 간격 **제안만**
+    (자동 변경 금지, 설정에서 [제안 적용])
+  - **동작 로테이션** — `src/core/actionRotation.ts`. 스트레칭 카드가 발화마다 동작 카드
+    원고 8종(A1~C2)을 순서대로 보여준다. 상태(`action_index`)는 `behaviors` 행에 저장돼
+    세션·재시작을 넘어 이어진다. 오버레이 [자세히] → 새 Rust 커맨드
+    `show_action_detail` → 메인 창 상세 패널
+  - **눈·물 카드 문구**를 임시 지시문에서 원고(D1/E1) 첫 줄로 교체. `is_builtin` 시드에만
+    적용 — 기존 설치본 사용자 편집은 「기본값 복원」을 눌러야 바뀐다
+  - **근거 보기** — 설정 창 「휴식 루틴」에 `[왜 이 주기인가요?]` 토글
+  - vitest **178개** (+ waterGoal 10 / actionRotation 7)
+  - **같은 날 후속**: 동작 카드 B2·B4 출처의 "동일 (…)" 축약 표현(로테이션 순서상 맥락이
+    끊기는 문제로 지적했던 것)을 수정본으로 교체 — B2·B3·B4 출처를 B1 과 같은 문장으로
+    통일, C2 도 "OSHA"→"미국 산업안전보건청(OSHA)"로 표기 통일. 콘텐츠 문구만 바뀌었고
+    로테이션 로직·DB 값은 그대로다
 
 ## 진행 중
 
 없음. **다음 작업은 D3.**
 
 ### 남은 자투리
+
+- **D2.9 시각 확인.** 0.4.0 설치는 됐지만 아직 화면을 실제로 띄워서 본 적은 없다.
+  ① 오버레이 카드에서 동작 이름 + 방법 첫 줄이 540×139 폭에 안 잘리고 읽히는가
+  ② 메인 창 동작 상세 패널(`ActionDetailCard`) 배치 ③ 설정 창 신체정보·물 참고 기준
+  섹션 레이아웃(라이트/다크 둘 다)
 
 - **D2.8 시각 확인 3건.** 자동 캡처(4화면 × 라이트·다크 8장)로는 문제 없어 보였지만
   DWM 합성 때문에 캡처는 증거일 뿐이다. 눈으로 볼 것:
@@ -194,3 +240,5 @@ D2.7·D2.8 + AI 드롭다운까지 들어간 빌드다. 마이그레이션 v4 �
 | [0009](docs/decisions/0009-overlay-queue-serialize.md) | 겹친 발화는 병합하지 않고 큐로 직렬화 | D2.7 |
 | [0010](docs/decisions/0010-design-tokens-and-css-guardrail.md) | 디자인 값은 토큰 한 곳에서만, 위반은 stylelint 대신 vitest 로 | D2.8 |
 | [0011](docs/decisions/0011-ui-rules-as-pure-functions.md) | 화면 동작 규칙은 컴포넌트가 아니라 순수 함수에 (테스트가 닿게) | D2.8 후속 |
+| [0012](docs/decisions/0012-action-rotation-state-and-profile-table.md) | 동작 로테이션 상태는 behaviors 행에, 신체정보는 별도 profile 테이블에 | D2.9 |
+| [0013](docs/decisions/0013-main-hidden-signal-not-page-visibility.md) | 창 숨김 판단은 Page Visibility 대신 Rust 의 명시적 이벤트로 | D2.8 후속 |
