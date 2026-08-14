@@ -28,6 +28,52 @@ describe('ACTION_ROTATION', () => {
   })
 })
 
+// ─── D2.11 — 카운트다운 단계(steps) ────────────────────────────────────────
+
+describe('ACTION_ROTATION 단계(steps)', () => {
+  it('단계 합은 v4 기본 행위 시간(60초)과 일치한다 — 안 맞으면 원고 오류', () => {
+    for (const action of ACTION_ROTATION) {
+      const sum = action.steps.reduce((s, step) => s + step.durationSec, 0)
+      expect(sum, `${action.id} 단계 합`).toBe(60)
+    }
+  })
+
+  it('모든 단계는 라벨이 있고 시간이 양수다', () => {
+    for (const action of ACTION_ROTATION) {
+      expect(action.steps.length).toBeGreaterThan(0)
+      for (const step of action.steps) {
+        expect(step.label.length).toBeGreaterThan(0)
+        expect(step.durationSec).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('minDurationSec 이 있으면 authored durationSec 을 넘지 않는다(그 값이 곧 하한이어야 한다)', () => {
+    for (const action of ACTION_ROTATION) {
+      for (const step of action.steps) {
+        if (step.minDurationSec !== undefined) {
+          expect(step.minDurationSec).toBeLessThanOrEqual(step.durationSec)
+        }
+      }
+    }
+  })
+
+  it('좌우 대칭 동작(B1)은 2단계, 손목(C1)은 4단계, 나머지는 1단계다', () => {
+    const byId = new Map(ACTION_ROTATION.map((a) => [a.id, a.steps.length]))
+    expect(byId.get('B1')).toBe(2)
+    expect(byId.get('C1')).toBe(4)
+    for (const id of ['A1', 'A2', 'B2', 'B3', 'B4', 'C2']) {
+      expect(byId.get(id)).toBe(1)
+    }
+  })
+
+  it('C1(손목)만 전환음을 생략한다', () => {
+    for (const action of ACTION_ROTATION) {
+      expect(action.muteStepChime ?? false).toBe(action.id === 'C1')
+    }
+  })
+})
+
 describe('actionById', () => {
   it('id 로 찾는다 — 메인 창 상세가 id 만 받는다', () => {
     expect(actionById('B3')?.name).toBe('턱 당기기')

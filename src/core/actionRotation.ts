@@ -9,7 +9,7 @@
  * 앱을 재시작해도 이어진다. 지금은 내장 스트레칭(`id === 'stretch'`)만 쓴다.
  */
 
-import { ACTION_CARDS } from '../constants/strings'
+import { ACTION_CARDS, type ActionStepContent } from '../constants/strings'
 
 export interface ActionCard {
   id: string
@@ -17,6 +17,10 @@ export interface ActionCard {
   method: readonly string[]
   duration: string
   source: string
+  /** 카운트다운 자동 전환용 단계(D2.11). 목표 시간에 맞춰 재배분하려면 `scaleSteps` 를 거친다 */
+  steps: readonly ActionStepContent[]
+  /** C1(손목) 전용 — 단계 전환음을 생략한다 */
+  muteStepChime?: boolean
 }
 
 /** 동작 카드 원고 「배치 제안」의 순서 그대로: 일어나기·목·손목을 고루 섞는다 */

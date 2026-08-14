@@ -5,16 +5,19 @@
  * **재생 주체는 오버레이 창**이다. 메인 창은 트레이로 숨어 있을 수 있어서 소리를 맡길 수 없다.
  * 설정 창은 볼륨을 맞출 때 [미리듣기]에만 이 모듈을 쓴다.
  *
- * 두 지점에서만 울린다:
+ * 세 지점에서 울린다:
  *   ① `start` — 카드가 뜰 때. 행동 종류와 무관하게 무조건
  *   ② `end`   — 카운트다운이 끝날 때. 행위 시간이 있는 행동만
+ *   ③ `step`  — 카운트다운 중 동작 단계가 자동 전환될 때(D2.11). **새 소리를 만들지 않고**
+ *      `end` 와 같은 짧은 고음을 그대로 재사용한다 — cue 키만 나눠서 stdout 로그(`sound step …`)
+ *      에서 "완전히 끝났다"와 "다음 단계로 넘어갔다"를 구분할 수 있게 했다.
  * 스누즈·건너뛰기·큐 대기는 무음이다 — 사용자가 이미 카드를 보고 있는 상황이라
  * 소리는 정보가 아니라 방해가 된다.
  */
 
 import { MAX_SOUND_VOLUME, MIN_SOUND_VOLUME } from '../core/settings'
 
-export type SoundCue = 'start' | 'end'
+export type SoundCue = 'start' | 'end' | 'step'
 
 interface Note {
   freq: number
@@ -34,6 +37,8 @@ const CUES: Record<SoundCue, Note[]> = {
     { freq: 880.0, at: 0.13, length: 0.24 }, // A5
   ],
   end: [{ freq: 1174.66, at: 0, length: 0.1 }], // D6
+  // end 와 완전히 같은 정의 — 재사용이지 새 소리가 아니다
+  step: [{ freq: 1174.66, at: 0, length: 0.1 }], // D6
 }
 
 /** 볼륨 100% 일 때의 진폭. 사인파는 0.25 만 돼도 충분히 들린다 — 놀라게 하려는 게 아니다 */

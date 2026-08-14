@@ -53,21 +53,53 @@ export const BEHAVIOR_MESSAGE: Record<string, string> = {
  * "동일"이라는 축약 표현이 로테이션 순서상 맥락을 잃는 문제(B4 는 B1 바로 뒤가 아니다)를
  * 없앴다. C2 도 같은 수정본에서 "OSHA" → "미국 산업안전보건청(OSHA)"로 풀어 썼다(C1 과 통일).
  */
+/**
+ * 카운트다운 자동 전환용 단계(D2.11, 2026-08-14 결정). `durationSec` 합은 v4 기본값(60초)과
+ * 일치한다(`actionRotation.test.ts` 가 검증). `minDurationSec` 은 원문에 시간이 **명시된**
+ * 단계에만 둔다 — 스트레칭 유지 시간은 근거의 일부라 사용자가 행위 시간을 짧게 설정해도
+ * 그 아래로는 줄지 않는다(`scaleSteps`, `src/core/actionSteps.ts`). 회수만 적힌
+ * 동작(B2·B3·C2)과 범위가 이미 어긋나 있는 A2(CLAUDE.md 승인 — 그대로 둠)에는 두지 않는다.
+ */
+export interface ActionStepContent {
+  readonly label: string
+  readonly durationSec: number
+  readonly minDurationSec?: number
+}
+
 export const ACTION_CARDS: Record<
   string,
-  { name: string; method: readonly string[]; duration: string; source: string }
+  {
+    name: string
+    method: readonly string[]
+    duration: string
+    source: string
+    steps: readonly ActionStepContent[]
+    /** C1(손목) 전용 — 15초마다 전환음이 4번 울리면 과하다는 도그푸딩 피드백으로 생략 */
+    muteStepChime?: boolean
+  }
 > = {
   A1: {
     name: '앉았다 일어나기 (의자 스쿼트)',
     method: ['의자에서 완전히 일어섰다가 다시 앉기를 반복해요', '손은 사용하지 않고 다리 힘으로, 천천히'],
     duration: '1분간 반복 (본인 속도로)',
     source: '30분마다 1분 반복 기립이 2분 걷기만큼 식후 인슐린을 낮췄다는 연구가 있어요 (J Appl Physiol, 2021)',
+    steps: [
+      {
+        label: '의자에서 완전히 일어섰다가 다시 앉기를 반복해요 · 손은 사용하지 않고 다리 힘으로, 천천히',
+        durationSec: 60,
+        minDurationSec: 60, // 연구가 측정한 프로토콜 자체가 "1분"
+      },
+    ],
   },
   A2: {
     name: '가볍게 걷기',
     method: ['자리에서 일어나 복도나 방 안을 천천히 걸어요', '물 뜨러 가기, 창밖 보러 가기도 좋아요'],
     duration: '2~5분',
     source: '좌식을 짧은 걷기로 중단하면 식후 혈당 반응이 낮아졌다는 연구가 있어요 (Diabetes Care, 2012)',
+    // "2~5분"과 실제 카운트다운(60초)의 불일치는 이 기능 이전부터 있던 것 — 손대지 않는다
+    steps: [
+      { label: '자리에서 일어나 복도나 방 안을 천천히 걸어요 · 물 뜨러 가기, 창밖 보러 가기도 좋아요', durationSec: 60 },
+    ],
   },
   B1: {
     name: '목 옆으로 기울이기',
@@ -77,18 +109,42 @@ export const ACTION_CARDS: Record<
     ],
     duration: '15~30초 × 좌우 각 1회',
     source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+    steps: [
+      {
+        label: '왼쪽 · 한 손을 머리에 얹고 귀가 어깨에 닿는 방향으로 천천히 기울여요 · 반대쪽 목 옆이 당기는 느낌에서 멈추고 유지',
+        durationSec: 30,
+        minDurationSec: 15, // 원문 범위(15~30초)의 하한
+      },
+      {
+        label: '오른쪽 · 한 손을 머리에 얹고 귀가 어깨에 닿는 방향으로 천천히 기울여요 · 반대쪽 목 옆이 당기는 느낌에서 멈추고 유지',
+        durationSec: 30,
+        minDurationSec: 15,
+      },
+    ],
   },
   B2: {
     name: '어깨 으쓱하고 내리기',
     method: ['숨 들이쉬며 어깨를 귀 쪽으로 최대한 올려요', '3초 멈춘 뒤 숨 내쉬며 툭 떨어뜨려요'],
     duration: '10회 반복',
     source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+    steps: [
+      {
+        label: '숨 들이쉬며 어깨를 귀 쪽으로 최대한 올려요 · 3초 멈춘 뒤 숨 내쉬며 툭 떨어뜨려요 (10회 반복)',
+        durationSec: 60,
+      },
+    ],
   },
   B3: {
     name: '턱 당기기',
     method: ['시선은 정면, 턱을 뒤로 밀어 이중턱을 만들어요', '뒷목이 길어지는 느낌으로 5초 유지'],
     duration: '10회 반복',
     source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+    steps: [
+      {
+        label: '시선은 정면, 턱을 뒤로 밀어 이중턱을 만들어요 · 뒷목이 길어지는 느낌으로 5초 유지 (10회 반복)',
+        durationSec: 60,
+      },
+    ],
   },
   B4: {
     name: '가슴 펴기',
@@ -98,6 +154,13 @@ export const ACTION_CARDS: Record<
     ],
     duration: '15~30초 × 2회',
     source: '규칙적인 목·어깨 스트레칭 4주로 사무직의 목 통증과 기능이 개선됐다는 연구가 있어요 (Clin Rehabil, 2016)',
+    steps: [
+      {
+        label: '등 뒤에서 깍지 끼고 팔을 아래로 뻗으며 가슴을 열어요 · 어깨가 뒤로 모이는 느낌에서 유지 (문틀 잡고 해도 좋아요)',
+        durationSec: 60,
+        minDurationSec: 30, // 원문 범위 하한(15초) × 2회
+      },
+    ],
   },
   C1: {
     name: '손목 젖히기 스트레칭',
@@ -107,12 +170,43 @@ export const ACTION_CARDS: Record<
     ],
     duration: '각 15초 × 좌우',
     source: '미국 산업안전보건청(OSHA)은 반복적인 컴퓨터 작업 중 짧은 휴식과 스트레칭을 권고해요',
+    muteStepChime: true,
+    steps: [
+      {
+        label: '위로 · 왼쪽 — 팔을 앞으로 뻗고 손바닥이 정면을 보게 손끝을 위로, 반대 손으로 손가락을 몸 쪽으로 지그시 당겨요',
+        durationSec: 15,
+        minDurationSec: 15, // 원문 고정값("각 15초")
+      },
+      {
+        label: '위로 · 오른쪽 — 팔을 앞으로 뻗고 손바닥이 정면을 보게 손끝을 위로, 반대 손으로 손가락을 몸 쪽으로 지그시 당겨요',
+        durationSec: 15,
+        minDurationSec: 15,
+      },
+      {
+        // 원문("손끝 아래로도 반복")에 방향별 동작 지시가 없다 — 위 단계의 "당겨요" 문구를
+        // 지어내 붙이지 않고, 라벨을 최소화해 원고 톤 그대로 둔다 (2026-08-14 수정)
+        label: '손끝 아래로 — 왼쪽',
+        durationSec: 15,
+        minDurationSec: 15,
+      },
+      {
+        label: '손끝 아래로 — 오른쪽',
+        durationSec: 15,
+        minDurationSec: 15,
+      },
+    ],
   },
   C2: {
     name: '선 채 허리 젖히기',
     method: ['일어서서 양손을 허리에 대요', '시선은 위로, 허리를 천천히 뒤로 젖혔다 돌아와요'],
     duration: '5회 반복',
     source: '미국 산업안전보건청(OSHA)은 장시간 정적 자세 작업 시 자세를 바꾸고 몸을 펴는 휴식을 권고해요',
+    steps: [
+      {
+        label: '양손을 허리에 대고 시선은 위로, 허리를 천천히 뒤로 젖혔다 돌아와요 (5회 반복)',
+        durationSec: 60,
+      },
+    ],
   },
 }
 
@@ -323,6 +417,9 @@ export const MAIN = {
    */
   BACKGROUND_NOTICE_TITLE: 'HourStep은 백그라운드에서 계속 실행돼요',
   BACKGROUND_NOTICE_BODY: '화면 오른쪽 아래 ^ 를 누르면 다시 열 수 있어요',
+
+  /** 창 우측 하단 완전 종료 버튼. TRAY.QUIT 와 같은 문구 — 트레이 메뉴와 같은 종료 경로다 */
+  QUIT_BUTTON: '완전히 종료',
 
   /** 세션 제어 + 타이머 */
   SESSION_START: '▶ 작업 시작',

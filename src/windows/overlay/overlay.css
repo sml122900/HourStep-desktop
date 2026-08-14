@@ -129,6 +129,30 @@ body,
   color: var(--text-muted);
 }
 
+/* 카운트다운 단계 진행바(D2.11) — 세그먼트 수 = 단계 수. 색은 토큰만 쓴다 */
+.overlay-card__step-bar {
+  display: flex;
+  gap: var(--sp-1);
+  margin-top: var(--sp-3);
+  padding-left: var(--body-indent);
+}
+
+.overlay-card__step-seg {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--bg-sunken);
+}
+
+.overlay-card__step-seg--done {
+  background: var(--accent);
+}
+
+.overlay-card__step-seg--active {
+  background: var(--accent);
+  opacity: 0.55;
+}
+
 .overlay-card__summary {
   margin: var(--sp-3) 0 0;
   padding: 0 0 0 var(--body-indent);

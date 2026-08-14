@@ -15,6 +15,7 @@ import {
   nextActionIndex,
   normalizeActionPrefs,
 } from '../../core/actionRotation'
+import { type CurrentStep, type ScaledStep, currentStepAt, scaleSteps, stepsTotalMs } from '../../core/actionSteps'
 import {
   cardMessage,
   intervalMinutes,
@@ -230,6 +231,15 @@ export default function OverlayWindow() {
   const idleSinceRef = useRef<number | null>(null)
   const idleRemindedRef = useRef(false)
   const dismissingRef = useRef(false)
+  /**
+   * 카운트다운 단계(D2.11) — 진입 시 한 번 `scaleSteps` 로 확정해 둔다(매 렌더 재계산 방지).
+   * `null` 이면 이 카운트다운은 단계가 없는 행동(눈휴식 등, 기존 방식대로 방법 전문을 보여준다).
+   */
+  const countdownStepsRef = useRef<ScaledStep[] | null>(null)
+  /** 위 steps 의 합계(ms). floor 가 걸리면 behavior.durationSec*1000 보다 길 수 있다 */
+  const countdownTotalMsRef = useRef(0)
+  /** 직전에 보여준 단계 인덱스 — 바뀔 때만 전환음을 울린다 */
+  const lastStepIndexRef = useRef<number | null>(null)
 
   const setActive = useCallback((next: Active | null) => {
     activeRef.current = next
@@ -344,7 +354,22 @@ export default function OverlayWindow() {
       // 기록은 이미 'done' 이다 — 중간에 [중단]해도 되돌리지 않는다 (사용자는 실제로 시작했다).
       if (action === 'done' && current.behavior.durationSec > 0) {
         dismissingRef.current = false
-        setRemainingMs(current.behavior.durationSec * 1000)
+
+        // D2.11 — 로테이션 동작이면 단계별 카운트다운을 쓴다. `current.behavior.actionIndex` 는
+        // 위에서 이미 "다음" 을 계산해 behaviorsRef 에 저장했지만 이 스냅샷 자체는 안 바뀐다 —
+        // 카드가 보여주던 그 동작(예: C1)의 단계를 그대로 쓴다.
+        const rotation =
+          current.behavior.id === STRETCH_ROTATION_ID
+            ? actionAt(current.behavior.actionIndex, enabledActionIds(actionPrefsRef.current))
+            : null
+        const scaled = rotation ? scaleSteps(rotation.steps, current.behavior.durationSec) : null
+        const totalMs = scaled ? stepsTotalMs(scaled) : current.behavior.durationSec * 1000
+
+        countdownStepsRef.current = scaled
+        countdownTotalMsRef.current = totalMs
+        lastStepIndexRef.current = scaled ? 0 : null
+
+        setRemainingMs(totalMs)
         setPhase('counting')
         return
       }
@@ -426,6 +451,32 @@ export default function OverlayWindow() {
     void invoke('log_debug', { line: playCue('end', settingsRef.current) })
     hide()
   }, [phase, remainingMs, hide])
+
+  /**
+   * 단계 자동 전환음(D2.11) — 위 종료음과 같은 이유로 updater 밖에서, remainingMs 가
+   * 바뀔 때만 판단한다. C1(손목)은 15초마다 4번 울리면 과하다는 피드백으로 생략(muteStepChime).
+   */
+  useEffect(() => {
+    if (phase !== 'counting') return
+    const steps = countdownStepsRef.current
+    if (!steps) return
+
+    const elapsed = countdownTotalMsRef.current - remainingMs
+    const current = currentStepAt(steps, elapsed)
+    if (!current) return
+
+    if (lastStepIndexRef.current !== null && current.index !== lastStepIndexRef.current) {
+      const behavior = activeRef.current?.kind === 'behavior' ? activeRef.current.behavior : null
+      const rotation =
+        behavior?.id === STRETCH_ROTATION_ID
+          ? actionAt(behavior.actionIndex, enabledActionIds(actionPrefsRef.current))
+          : null
+      if (!rotation?.muteStepChime) {
+        void invoke('log_debug', { line: playCue('step', settingsRef.current) })
+      }
+    }
+    lastStepIndexRef.current = current.index
+  }, [phase, remainingMs])
 
   const reloadSettings = useCallback(async () => {
     settingsRef.current = await db.loadSettings()
@@ -727,6 +778,12 @@ export default function OverlayWindow() {
 
   const seconds = Math.ceil(remainingMs / 1000)
 
+  // D2.11 — 단계가 있는 카운트다운이면 "전체 남은 시간"이 아니라 "이 단계 남은 시간"을 보여준다
+  const currentStep: CurrentStep | null =
+    phase === 'counting' && countdownStepsRef.current
+      ? currentStepAt(countdownStepsRef.current, countdownTotalMsRef.current - remainingMs)
+      : null
+
   return (
     // 창 전체는 투명. 카드 영역 밖은 그리지 않는다.
     <div className="overlay-root">
@@ -741,6 +798,8 @@ export default function OverlayWindow() {
               behavior={active.behavior}
               phase={phase}
               seconds={seconds}
+              currentStep={currentStep}
+              totalSteps={countdownStepsRef.current?.length ?? 0}
               enabledIds={enabledActionIds(actionPrefsRef.current)}
               onDismiss={dismiss}
               onClose={hide}
@@ -784,6 +843,8 @@ function BehaviorCard({
   behavior,
   phase,
   seconds,
+  currentStep,
+  totalSteps,
   enabledIds,
   onDismiss,
   onClose,
@@ -791,6 +852,8 @@ function BehaviorCard({
   behavior: Behavior
   phase: Phase
   seconds: number
+  currentStep: CurrentStep | null
+  totalSteps: number
   enabledIds: Set<string>
   onDismiss: (action: CompletionAction) => void
   onClose: () => void
@@ -802,12 +865,16 @@ function BehaviorCard({
     behavior.id === STRETCH_ROTATION_ID ? actionAt(behavior.actionIndex, enabledIds) : null
   const message = rotation ? rotation.name : cardMessage(behavior)
 
-  // D2.10 — 카운트다운 중에는 방법 전문 + 시간을 보여준다. 눈휴식(D1)은 로테이션이
-  // 없는 단일 동작이라 고정 원고(EYE_REST_*)를 쓴다. 물(duration 0)은 이 phase 에 안 온다.
+  // D2.11 — 로테이션 동작은 카운트다운 중 단계별 라벨 + 진행바를 보여준다(아래). 눈휴식(D1)은
+  // 로테이션도 단계도 없는 단일 동작이라 예전처럼 고정 원고(EYE_REST_*) 전문을 보여준다.
+  // 물(duration 0)은 이 phase 에 안 온다.
   const countdownMethod: readonly string[] | null =
-    phase !== 'counting' ? null : rotation ? rotation.method : behavior.id === 'eyes' ? EYE_REST_METHOD : null
+    phase === 'counting' && !rotation && behavior.id === 'eyes' ? EYE_REST_METHOD : null
   const countdownDuration: string | null =
-    phase !== 'counting' ? null : rotation ? rotation.duration : behavior.id === 'eyes' ? EYE_REST_DURATION : null
+    phase === 'counting' && !rotation && behavior.id === 'eyes' ? EYE_REST_DURATION : null
+
+  // 단계가 있으면 "이 단계 남은 시간", 없으면 기존처럼 전체 남은 시간을 큰 숫자로 보여준다
+  const displaySeconds = currentStep ? Math.ceil(currentStep.remainingMsInStep / 1000) : seconds
 
   return (
     <>
@@ -822,12 +889,35 @@ function BehaviorCard({
         >
           {phase === 'card'
             ? message
-            : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}
+            : `${Math.floor(displaySeconds / 60)}:${String(displaySeconds % 60).padStart(2, '0')}`}
         </p>
       </div>
 
       {phase === 'card' && rotation && (
         <p className="overlay-card__note">{rotation.method[0]}</p>
+      )}
+
+      {phase === 'counting' && currentStep && (
+        <>
+          <p className="overlay-card__note">{currentStep.step.label}</p>
+          {totalSteps > 1 && (
+            <div className="overlay-card__step-bar" aria-hidden="true">
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    'overlay-card__step-seg' +
+                    (i < currentStep.index
+                      ? ' overlay-card__step-seg--done'
+                      : i === currentStep.index
+                        ? ' overlay-card__step-seg--active'
+                        : '')
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {countdownMethod && (
