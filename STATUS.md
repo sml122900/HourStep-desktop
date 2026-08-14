@@ -4,7 +4,7 @@
 > 작업을 이어갈 때 가장 먼저 읽고, 작업이 끝나면 여기부터 갱신한다.
 > 배경·규칙은 `CLAUDE.md`, 상세 기록은 `docs/daily/`·`docs/decisions/`.
 
-**마지막 갱신: 2026-08-12** · **현재 Phase: D2.10 완료(자동 검증까지) → 다음 D3**
+**마지막 갱신: 2026-08-14** · **현재 Phase: D2.11 완료(자동 검증 + C1 화면 캡처까지) → 다음 D3**
 **설치본: 0.4.2** (`%LOCALAPPDATA%\HourStep`, NSIS per-user, `/S` 무인 설치) —
 D2.10 후속(완전 종료 버튼)까지 들어간 빌드다. `package.json`/`Cargo.toml`/
 `tauri.conf.json` 세 곳 모두 0.4.1→0.4.2(패치, 0.4.1 때와 같은 기준). 설치 전
@@ -186,6 +186,35 @@ DB 를 ASCII 경로로 복사해(사용자명에 한글이 있어 `sqlite3.exe` 
     반복 검증된 동일 로직). db-dump 는 하지 않았다 — 이 세션은 세션 시작/종료 명령을 전혀
     보내지 않아 DB 변경 자체가 없다. **설치본은 검증을 위해 종료한 채로 남겨뒀다** — 다시
     쓰려면 수동 실행 또는 재부팅(자동실행) 필요
+- **D2.11 (2026-08-14)** — 카운트다운 동작별 단계 타이머. DB 스키마 변경 없음(원고
+  콘텐츠 필드만 추가). 일지 `docs/daily/2026-08-14-phase-d2.11.md`, 근거 `docs/decisions/0015`
+  - **원고** — 8종을 단계(`steps: {label, durationSec, minDurationSec?}[]`)로 분할.
+    좌우 대칭은 2~4단계, 단일 동작은 1단계. 합은 v4 기본 행위 시간(60초)과 일치.
+    C1(손목)의 "아래로" 단계는 원문에 없는 방향 지시를 지어내지 않고 최소 라벨로
+  - **`src/core/actionSteps.ts`** — `scaleSteps(steps, targetDurationSec)`: 사용자가
+    설정한 실제 행위 시간에 맞춰 water-filling 으로 재배분하되, 원문에 시간이 명시된
+    단계(`minDurationSec`)는 그 아래로 안 내려간다 — **목표 시간이 근거 유지시간
+    합보다 짧으면 설정값 대신 근거 유지시간 합을 쓴다**(의도적 트레이드오프,
+    `docs/decisions/0015`). largest-remainder 반올림으로 합계 오차·0초 단계 방지.
+    `currentStepAt(steps, elapsedMs)` 로 경과시간 → 현재 단계 계산. vitest 13개 +
+    콘텐츠 무결성(8종 「단계 합=60초」) 4개
+  - **오버레이 UI** — 카운트다운 중 방법 전문 대신 "현재 단계 라벨 + 단계 내 남은
+    시간(큰 숫자) + 진행바"로 교체. 눈휴식(로테이션 없음)은 기존 방식 유지. 진행바는
+    새 색 없이 기존 토큰만 사용
+  - **전환음** — 새로 합성하지 않고 기존 종료음(`end`)과 완전히 같은 정의를
+    `'step'` cue 로 재사용(로그 구분용). C1 은 15초마다 4번 울리는 게 과하다는
+    피드백으로 `muteStepChime` 콘텐츠 플래그로 생략
+  - vitest **208개** (+ actionSteps 13, actionRotation 콘텐츠 무결성 5)
+  - **실 도그푸딩 DB 대상 화면 캡처 검증** — C1 만 남겨 60초 카운트다운 동안 4단계가
+    15초마다 전환·진행바·남은시간이 맞물리는 것을 캡처로 확인, `sound step` 로그
+    0회로 전환음 생략도 함께 확인. 검증 중 중첩 셸이 `--debug-cmd` 콤마를 깨뜨린
+    함정(`docs/troubleshooting/powershell-nested-command-comma-corruption.md`)과
+    "카드가 즉시 닫힌다"가 실은 실 DB 의 스트레칭 행위시간이 이미 0초였던 것(버그
+    아님, `dev-and-installed-share-db.md` 와 같은 패턴)을 겪었다. 테스트로 생긴
+    세션·기록은 두 라운드 모두 정확한 timestamp 로 특정해 지웠고(각 라운드
+    전후 카운트 대조), `action_prefs`/`duration_sec` 도 원래 값으로 복구했다 —
+    다만 스트레칭 로테이션 포인터(`action_index`)만 원래 값을 못 구해 C1(3)으로
+    남았다(통계 영향 없음, 사용자 확인 받음)
 
 ## 진행 중
 
@@ -193,6 +222,10 @@ DB 를 ASCII 경로로 복사해(사용자명에 한글이 있어 `sqlite3.exe` 
 
 ### 남은 자투리
 
+- **D2.11 시각 확인 일부만 함.** C1(손목, 4단계) 카운트다운은 실기기 캡처로 확인했지만,
+  ① B1(2단계) 좌우 전환·A1/A2/B2/B3/B4/C2(1단계) 라벨은 vitest 로만 확인, 실제 카드는
+  아직 안 봄 ② 라이트 테마에서 진행바 세그먼트 대비 미확인 ③ 진행바 "지난 단계"와
+  "현재 단계"의 불투명도 차이가 캡처 해상도상 애매했다 — 육안 확인 필요
 - **D2.10 시각 확인.** 소스에만 있고(설치본 미반영) 화면을 실제로 띄워서 본 적은 없다.
   ① 설정 창 「동작 목록 보기」 패널 — 8개 항목 쌓였을 때 스크롤·간격, 라이트/다크
   ② 카운트다운 중 늘어난 카드(540×219 근방)가 어색하지 않은지, 방법 2줄이 안 잘리는지
@@ -296,3 +329,4 @@ DB 를 ASCII 경로로 복사해(사용자명에 한글이 있어 `sqlite3.exe` 
 | [0012](docs/decisions/0012-action-rotation-state-and-profile-table.md) | 동작 로테이션 상태는 behaviors 행에, 신체정보는 별도 profile 테이블에 | D2.9 |
 | [0013](docs/decisions/0013-main-hidden-signal-not-page-visibility.md) | 창 숨김 판단은 Page Visibility 대신 Rust 의 명시적 이벤트로 | D2.8 후속 |
 | [0014](docs/decisions/0014-action-prefs-table-and-countdown-resize-reuse.md) | 동작 선택은 별도 `action_prefs` 테이블에, 카운트다운 창 확장은 기존 `fitWindow` 재사용 | D2.10 |
+| [0015](docs/decisions/0015-step-timer-floor-and-sound-reuse.md) | 단계 타이머는 설정값보다 근거 유지시간을 우선(floor), 전환음은 새로 만들지 않고 재사용 | D2.11 |
