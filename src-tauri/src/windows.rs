@@ -52,6 +52,14 @@ pub fn trigger_test_overlay(app: AppHandle) {
     crate::overlay::trigger(&app, crate::overlay::TEST_BEHAVIOR_ID);
 }
 
+/// 메인 창의 [완전히 종료] 버튼 — 트레이 우클릭 [완전히 종료]와 완전히 같은 경로
+/// (`app.exit(0)`, `tray.rs` `ID_QUIT` 과 동일).
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    println!("[main] 완전히 종료 (창 버튼)");
+    app.exit(0);
+}
+
 /// 오버레이 카드의 [자세히] — 메인 창을 띄우고 어떤 동작을 펼칠지 알려준다 (D2.9).
 /// 상세 내용(방법·시간·출처)은 Rust 가 모른다 — `src/constants/strings.ts` 의
 /// `ACTION_CARDS` 가 단일 출처이고, 여기서는 "무엇을 보여줄지"만 실어 나른다.

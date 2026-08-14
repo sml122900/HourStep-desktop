@@ -50,6 +50,7 @@ pub fn run() {
             session::start_session_command,
             windows::hide_main_window,
             windows::open_settings_window,
+            windows::quit_app,
             windows::show_action_detail,
             windows::trigger_test_overlay,
         ])

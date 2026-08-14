@@ -5,6 +5,16 @@
 > 배경·규칙은 `CLAUDE.md`, 상세 기록은 `docs/daily/`·`docs/decisions/`.
 
 **마지막 갱신: 2026-08-12** · **현재 Phase: D2.10 완료(자동 검증까지) → 다음 D3**
+**설치본: 0.4.2** (`%LOCALAPPDATA%\HourStep`, NSIS per-user, `/S` 무인 설치) —
+D2.10 후속(완전 종료 버튼)까지 들어간 빌드다. `package.json`/`Cargo.toml`/
+`tauri.conf.json` 세 곳 모두 0.4.1→0.4.2(패치, 0.4.1 때와 같은 기준). 설치 전
+실행 중이던 0.4.1(PID 48792)을 종료 → `pnpm build` → `pnpm tauri build`(NSIS/MSI) →
+`HourStep_0.4.2_x64-setup.exe /S`. 설치 후 직접 실행해 캡처로 새 버튼·문구 배치를
+확인했고, DB(`work_sessions=13 completion_logs=99 behaviors=3`)는 ASCII 경로로 뜬
+사본을 sqlite3 로 조회해 실행 전후 대조— 이번 변경은 스키마·세션 로직을 건드리지
+않아 그대로였다(raw sqlite 조회이며 db-dump 훅은 release 빌드엔 없다 — 개발 빌드
+전용).
+
 **설치본: 0.4.1** (`%LOCALAPPDATA%\HourStep`, NSIS per-user, `/S` 무인 설치) —
 2026-08-12 01:50 설치 완료. D2.10(동작 목록·선택 + 카운트다운 중 동작 안내,
 마이그레이션 v6)까지 들어간 빌드다. 설치 직후 실행해 마이그레이션이 실제로 도는지
@@ -162,6 +172,20 @@ DB 를 ASCII 경로로 복사해(사용자명에 한글이 있어 `sqlite3.exe` 
     (D1 부터 있던, phase 전환마다 카드 실측 크기로 다시 맞추는 로직) 를 그대로 썼다 —
     새 Win32 코드 없이 `--debug-cmd` 로 540×164→540×219(+55px)→540×164 실측 확인
   - vitest **190개** (+ actionRotation 14: 스킵·최소1개·정규화·손상 케이스)
+- **D2.10 후속 (2026-08-12)** — 완전 종료 UX. 메인 창 하단에 [완전히 종료] 버튼 신설
+  (`windows::quit_app`, 트레이 [완전히 종료]와 완전히 같은 `app.exit(0)` 경로 — 새 Rust 로직
+  없음). 기존 백그라운드 안내 문구(`MAIN.DESCRIPTION`, 임의 수정 안 함)를 버튼 옆으로
+  옮기고 `word-break: keep-all` + 문장 경계 `<br/>` 로 어절 중간 개행을 막았다. 트레이 우클릭
+  [완전히 종료] 메뉴는 그대로 유지 — 둘 다 같은 커맨드를 부른다.
+  - 검증: `tsc --noEmit` / `cargo check` / vitest 190개 전부 통과. 화면 확인은 실행 중이던
+    설치본(0.4.1, PID 48792)을 사용자 승인 받아 종료한 뒤 dev 로 `--debug-cmd
+    wait:5000,main-show,wait:90000,quit` 로 창을 띄우고 **화면 캡처**(도구 세션 내 인라인
+    PowerShell, `EnumWindows`+면적 최댓값으로 진짜 창 골라냄)로 대조 — 버튼이 우측 하단에,
+    안내 문구가 어절 안 끊기고 문장 경계에서 줄바꿈되는 것 확인. 클릭 자체는 검증 정책상
+    합성 입력이라 하지 않았다(`app.exit(0)` 경로는 트레이 종료·`--debug-cmd quit` 로 이미
+    반복 검증된 동일 로직). db-dump 는 하지 않았다 — 이 세션은 세션 시작/종료 명령을 전혀
+    보내지 않아 DB 변경 자체가 없다. **설치본은 검증을 위해 종료한 채로 남겨뒀다** — 다시
+    쓰려면 수동 실행 또는 재부팅(자동실행) 필요
 
 ## 진행 중
 

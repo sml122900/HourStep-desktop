@@ -293,7 +293,20 @@ export default function MainWindow() {
         <Button onClick={() => invoke('trigger_test_overlay')}>{MAIN.TEST_OVERLAY_BUTTON}</Button>
       </div>
 
-      <p className="hint">{MAIN.DESCRIPTION}</p>
+      <footer className="footer">
+        <p className="hint footer__notice">
+          {/* 어절 중간 개행 방지(word-break: keep-all) + 문장 경계에서 자연스러운 개행 */}
+          {MAIN.DESCRIPTION.split(/(?<=\.) /).map((sentence, i, all) => (
+            <span key={i}>
+              {sentence}
+              {i < all.length - 1 && <br />}
+            </span>
+          ))}
+        </p>
+        <Button size="sm" onClick={() => invoke('quit_app')}>
+          {MAIN.QUIT_BUTTON}
+        </Button>
+      </footer>
     </main>
   )
 }

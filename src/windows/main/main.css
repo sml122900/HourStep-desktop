@@ -232,8 +232,19 @@ h1 {
   flex-wrap: wrap;
 }
 
+/* ─── 하단: 백그라운드 안내 + 완전 종료 ─── */
+
 /* 창을 채우고 남는 자리는 맨 아래 안내 위로 밀어낸다 */
-.shell > .hint:last-child {
+.footer {
   margin-top: auto;
   padding-top: var(--sp-1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.footer__notice {
+  /* 어절 중간에서 줄이 끊기지 않게 — 문장 경계 개행은 컴포넌트에서 <br/> 로 넣는다 */
+  word-break: keep-all;
 }
